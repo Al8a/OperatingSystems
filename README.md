@@ -1,2 +1,2 @@
 # OperatingSystems
-Operating Systems Class repo for project/homework1 
+Repo for Operating System's class assignments.
