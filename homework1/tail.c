@@ -10,12 +10,12 @@
 #define FIRST_LINE_ALLOC_SIZE ((size_t) 2)
 #define FIRST_ARRAY_SIZE ((size_t) 2)
 
-
-int main(int argc, char **argv){
+int main(int argc, char **argv) {
     char buffer[BUFFER_LEN];
     ssize_t read_res;  /* SIGNED */
     size_t read_bytes; /* UNSIGNED */
 
+	char *file = NULL;
     int fd;
     int num;
     int temp;
@@ -42,13 +42,38 @@ int main(int argc, char **argv){
     lines = NULL;
     lines_lengths = NULL;
 
+	/* 
+    	10 Default number of lines read 
+    	unless -n argument specified in argv[] + filename specified  
+  	*/
+	num = 10;    
+  	for (int i = 1; i < argc; i++) {
+    	if (str_comp(argv[i],"-n") == 0) {   /* Check for -n arg */
+      		if (++i >= argc) {                 /* Determine if invalid input detected */
+				display_error_message("head: option requires an argument -n [num]\n\tUsage: head -n <num> <filename>\n\tUsage: head <filename> -n <num>");
+				return 1;
+      		}
+      
+     		/* Convert input -n [num] to int */
+      		num = string_to_integer(argv[i]);
+      		if (num == 0) {   /* if zero, negative, or string entered */
+        		display_error_message("head: invalid num input\n");
+        		return 1;
+      		}
+    	} else {
+      		file = argv[i];
+    	}
+  	}
+
+  	fd = (file != NULL ? open(file, O_RDONLY) : 0); /* [statement] ? true : false  */
 
     
     while(1){
-        /* Try to read into the buffer 
-	   sizeof(buffer) bytes 
-	*/
-        read_res = read(0, buffer, sizeof(buffer));
+        /* 
+			Try to read into the buffer 
+	   		sizeof(buffer) bytes 
+		*/
+        read_res = read(fd, buffer, sizeof(buffer));
         
         /* Handle the return values of the read system call */
         
@@ -57,16 +82,16 @@ int main(int argc, char **argv){
         
         /* Return value negative, we have an error and we die */
         if (read_res < ((ssize_t) 0)) {
-	  /* Display the appropriate error message and die */
-	  display_error_message( "Error reading: %s\n");
-	  /* Deallocate everything that has been allocated */
-	  for (i=(size_t) 0; i<lines_len; i++){
-	    free(lines[i]);
-	  }
-	  free(lines);
-	  free(lines_lengths);
-	  return 1;
-	}
+	  		/* Display the appropriate error message and die */
+	  		display_error_message( "Error reading: %s\n");
+	  		/* Deallocate everything that has been allocated */
+	  		for (i=(size_t) 0; i<lines_len; i++){
+	    		free(lines[i]);
+	  		}
+	  		free(lines);
+	  		free(lines_lengths);
+	  		return 1;
+		}
         
         /* read_res is positive */
         read_bytes = (size_t) read_res;
@@ -282,13 +307,12 @@ int main(int argc, char **argv){
     */
     
     temp = 0;
-    num = 10;
     for (i= lines_len; i > (size_t) 0; i--){
       if (temp < num) {
 	my_write(1, lines[i - ((size_t)1)], lines_lengths[i - ((size_t) 1)]);
 	temp++;
       } else {
-	break;
+		break;
       }
     }
     
