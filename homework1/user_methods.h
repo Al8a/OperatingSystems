@@ -36,6 +36,7 @@ int string_to_integer(char *str);
 */
 char *copy_str(char *inStr, size_t len);
 
+int find_length(char *thatString);
 
 /* Print error message to console */
 int display_error_message(char *str);

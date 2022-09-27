@@ -70,49 +70,6 @@ int string_to_integer(char *str) {
     return num;
 }
 
-/*
-void *mem_set(void *src, int c, size_t bytes) {
-  unsigned char *ptr = src;                      
-  while(bytes--){                            
-    *ptr++ = (unsigned char)c;               
-  }                                        
-  return src;                            
-}                                   
-
-
-void *mem_cpy(void *dst, const void *src, size_t byte_c) {
-  char *ptr_dest = (char *)dst;
-  const char *ptr_src = (const char*)src;
-  if((ptr_dest != NULL) && (ptr_src != NULL)){
-    while(byte_c){                           
-      *(ptr_dest++) = *(ptr_src++);        
-      --byte_c;                            
-    }                                      
-  }                                                                                                                                
-  return dst;                                                                                                                             
-}
-
-void *mem_move(void *dst, const void *src, size_t byte_c) {                                                                                
-  unsigned char isCpyReq = 0;                                                                                                             
-  char *ptr_src = (char *) src;                                                                                                           
-  char *ptr_dst = (char *) dst;                                                                                                                                                                                                                                                    
-  if((ptr_src == NULL) || (ptr_dst == NULL)){                                                                                              
-    return NULL;                                                                                                                            
-  }                                                                                                                                          
-                                                                                                                                          
-  if((ptr_src < ptr_dst) && (ptr_dst < ptr_src + byte_c)) {                                                                                  
-    for(ptr_dst += byte_c, ptr_src += byte_c; byte_c--;) {                                                                                        
-      *--ptr_dst = *ptr_src;                                                                                                                
-    }                                                                                                                                       
-  } else {                                                                                                                                    
-    while (byte_c--){                                                                                                                      
-      *ptr_dst++ = *ptr_src++;                                                                                                             
-    }                                                                                                                                      
-  }                                                                                                                                        
-  return dst;                                                                                                                               
-}   
-*/
-
 char *copy_str(char *inStr, size_t len) {
   char *out_str = (char*) malloc(sizeof(char) * (len + 1));
   char *copy = out_str;  
@@ -129,7 +86,10 @@ char *copy_str(char *inStr, size_t len) {
 }
 
 
+/* Print to console */
 int display_error_message(char *str){
   write(1, str, find_length(str));
   return 0;
 }
+
+

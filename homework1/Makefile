@@ -1,10 +1,10 @@
 # Homework 1 Makefile
-OBJS = user_methods.c 	# Shared Object file list
+OBJS = user_methods.o 	# Shared Object file list
 CC = gcc		# Designated Compiler
-CFLAGS = -Wall -O3 -O 	# Compiler Flags set
+CFLAGS = -Wall -O3  	# Compiler Flags set
 
 # file dependencies
-user_methods.o: user_methods.c
+user_methods.o: user_methods.c 
 head.o: head.c user_methods.h
 tail.o: tail.c user_methods.h
 findlocationfast.o: findlocationfast.c user_methods.h
@@ -19,19 +19,19 @@ findlocation:
 all: head tail findlocationfast
 
 head: $(OBJS) head.o
-	$(CC) $(CFLAGS) $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
 tail: $(OBJS) tail.o
-	$(CC) $(CFLAGS) $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
-findlocationfast: S(OBJS) findlocationfast.o
-	$(CC) $(CFLAGS) $@ $^
+findlocationfast: $(OBJS) findlocationfast.o
+	$(CC) $(CFLAGS) -o $@ $^
 
 
 run-head: head
 	./head
 
-run-tail:tail
+run-tail: tail
 	./tail
 
 run-fast: findlocationfast

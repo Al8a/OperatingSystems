@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <fcntl.h>
-
+#include "user_methods.h"
 /* 
    CS4375 OS Fall22 
    Homework 1 Part 4
@@ -25,22 +25,6 @@ typedef struct entry_t {
   /* 6 + 25 + 1 = 32 character per line */
 } entry_t;
 
-
-/* Find string length */
-int findLength(char *thatString){
-  int length = 0;
-  while(thatString[length] != '\0'){
-    length++;
-  }
-  return length;
-}
-
-
-/* Print to console */
-int display_error_message(char *str){
-  write(1, str, findLength(str));
-  return 0;
-}
 
 /* Method to close file */
 int closeFile(int fd){
