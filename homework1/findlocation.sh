@@ -1,6 +1,6 @@
 #!/bin/bash/
 # This bash script is used to search for a designated file for a specific input pattern
-# in the text file 'nanpa'
+# in this case the text file 'nanpa'
 
 # Passsed Arguments:
 #    $0 - script name
