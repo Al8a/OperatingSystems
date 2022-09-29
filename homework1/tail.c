@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
         /* Return value negative, we have an error and we die */
         if (read_res < ((ssize_t) 0)) {
 	  		/* Display the appropriate error message and die */
-	  		display_error_message( "Error reading: %s\n");
+	  		display_error_message( "Error reading!\n");
 	  		/* Deallocate everything that has been allocated */
 	  		for (i=(size_t) 0; i<lines_len; i++){
 	    		free(lines[i]);
