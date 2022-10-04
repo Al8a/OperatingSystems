@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "close() did not work: %s\n", strerror(errno));
   }
   
-  /* Fill buffer w/ NULL terminator '\n' */
+  /* Fill buffer array w/ NULL terminators '\0' */
   for (int i = 0; i < sizeof(buffer); i++) {
     buffer[i] = '\0';
   }
