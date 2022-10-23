@@ -166,21 +166,72 @@ void __free_impl(void *);
 
 void *__malloc_impl(size_t size) {
   /* STUB */
-  return NULL;
+	size_t s;
+	void *ptr;
+	
+	if (size == (size_t) 0) return NULL; 
+	
+	s = size + sizeof(memory_block_t);
+	
+	if (s < size) return NULL; 
+	
+	ptr = (void*) __get_memory_block(s);
+	
+	if (ptr != NULL){
+		return (ptr + sizeof(memory_block_t));
+	}
+	
+	__new_memory_map(s);
+	ptr = (void*) __get_memory_blocks(s);
+	
+	if (ptr != NULL){
+		return (ptr + sizeof(memory_block_t));
+	}
+		
+	return NULL;
 }
 
 void *__calloc_impl(size_t nmemb, size_t size) {
   /* STUB */
-  return NULL;  
+	size_t s;
+	void *ptr;
+	
+	if(!__try_size_t_multiply(&s, nmemb, size)) return NULL;
+	
+	ptr = __malloc_impl(s);
+	
+	if (ptr != NULL){
+		__memset(ptr, 0, s);
+	}
 }
 
 void *__realloc_impl(void *ptr, size_t size) {
   /* STUB */
-  return NULL;  
+  	void *new_ptr;
+	memory_block_t *old_mem_block;
+	size_t s;
+	
+	if (ptr == NULL) return __malloc_impl(size);
+	
+	if (size == (size_t) 0) {
+		__free_impl(ptr);
+		return NULL;
+	}
+	
+	old_mem_block = (memory_block_t*) (ptr - sizeof(memory_block_t));
+	s = old_mem_block->size;
+	
+	if (size < s) s = size;
+	
+	__memcpy(new_ptr, ptr, s);
+	__free_impl(ptr);
+	return new_ptr;
 }
 
 void __free_impl(void *ptr) {
   /* STUB */
+	if (ptr = NULL) return;
+	__add_free_memory_ block(ptr-sizeof(memory_block_t), 1);
 }
 
 /* End of the actual malloc/calloc/realloc/free functions */
