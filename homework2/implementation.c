@@ -10,9 +10,9 @@
 
     All rights reserved.
 
-    Contributors:  ...
-                   ...
-		   ...                 and
+    Contributors:  Natasha Rovelli 
+                   Roxxanne White
+		   Alan Ochoa         and
 		   Christoph Lauter
 
     See file memory.c on how to compile this code.
