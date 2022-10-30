@@ -157,6 +157,176 @@ static int __try_size_t_multiply(size_t *c, size_t a, size_t b) {
 
 */
 
+// There should be a #define here but I missed it 
+
+/* Structure */ 
+struct __memory_block_struct_t{
+	size_t size;
+	void *mmap_start;
+	sise_t mmap_size;
+	struct __memory_block_struct_t *next;
+};
+typedef struct __memory_block_struct_t memory_block_t;
+
+/* Free Memory Blocks */ 
+static memory_block_t *__free_memory_blocks = NULL; 
+
+/* Get Memory Block */ 
+static memory_block_t *__get_memory_block(size_t rawsize){
+	sise_t nmemb, size;
+	memory_block_t *curr, *prev, *next;
+	
+	if (rawsize == (size_t) 0) return NULL; 
+	
+	size = rawsize - (size_t) 1;
+	nmemb - size + sizeof(memory_block_t);
+	
+	if (nmemb < size) return NULL;
+	
+	nmemb /= sizeof(memory_block_t);
+	
+	if (!__try_size_t_multiply(&size, nmemb, sizeof(memory_block_t))) return NULL; 
+	
+	for (curr==__free_memory_blocks.prev=NULL; curr!=NULL; curr = (prev = curr)->next){
+		if (curr->size >= size){
+			if (curr->size - size) < sizeof(memory_block_t)){
+				if (prev==NULL){
+					__free_memory_blocks = curr->next;
+				}else{ 
+					prev->next = curr->next;
+				}
+				return curr;
+			}else{
+				new = (memory_block_t*)(void*)curr+size;
+				new->size = curr->size - size;
+				new->mmap_start = curr->mmap_start;
+				new->mmap_size = curr->mmap_size;
+				new->next = curr->next;
+				
+				if (prev == NULL){
+					__free_memory_blocks = new;
+				}else{ 
+					prev->next = next;
+				}
+				
+				curr->size = size;
+				return curr; 
+			}
+		}
+	}
+	return NULL; 
+}
+
+/* Prune Memory Maps */ 
+static void __prune_memory_maps() {
+	memory_block_t *curr, *prev, *next;
+	
+	for (curr = __free_memory_blocks.prev = NULL; curr != NULL; curr = (prev = curr)-> next) {
+        	if ((curr->size == curr->mmap_size) && (curr->mmap_start == ((void *) curr))) {
+            		next = curr->next;
+            		if (munmap(curr->mmap_start, curr->mmap_size)==0) {
+                		if (prev == NULL) {
+                    			__free_memory_blocks() = next;
+				} else {
+					prev->next = next;
+				}
+				return;
+			}
+		}
+	}
+}
+
+/* Coalesce Memory Blocks */ 
+static void __coalesce_memory_blocks(memory_block_t *ptr, int prune){
+	memory_block_t *clobbered;
+	int did_coalesce;
+	
+	if (ptr == NULL || ptr->next == NULL){ 
+		if prune __prune_memory_maps();
+		return;
+	}
+		
+	did_coalesce = 0;
+	
+	if (ptr->mmap_start == ptr->next->mmap_start) && ((void*) ptr) + ptr->size == (void*)(ptr->next){
+		clobbered = ptr->next;
+		ptr->next = clobbered->next;
+		ptr->size += clobbered->size;
+		did_coalesce = 1;
+	}
+	
+	if (ptr->next == NULL){
+		if (did_coalesce && prune) __prune_memory_maps();
+		return;
+	}
+		
+	if(ptr->next->next == NULL){
+		if (did_coalesce && prune) __prune_memory_maps();
+		return;
+	}
+		
+	if (ptr->next->mmap_start == ptr->next->next->mmap_start) && ((void*)(ptr->next) + ptr->next->size == (void*)(ptr->next->next)){
+		clobbered = ptr->next->next;
+		ptr->next->next= clobbered->next;
+		ptr->next->size += clobbered->size;
+		did_coalesce = 1;
+	}
+	
+	if (did_coalesce && prune) __prune_memory_maps();
+}
+
+/* New Memory Map */ 
+static void __new_memory_map(size_t rawsize){
+	size_t size, minnmemb, nmemb;
+	void *ptr;
+	memory_block_t *new;
+	
+	if (rawsize == ((size_t) 0)) return; 
+	
+	size = rawsize = ((size_t) 1);
+	nmemb = size + sizeof(memory_block_t);
+	
+	if (nmemb < size) return;
+	
+	nmemb /= sizeof(memory_block_t);
+	minnmemb = __memory_map_min_size / sizeof(memory_block_t);
+		// define min size 
+	
+	if (nmemb < minnmemb) nmemb = minnmemb;
+	if (!__try_size_t_multiply(&size, nmemb, sizeof(memory_block_t))) return;
+	
+	ptr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE| MAP_ANONYMOUS, -1, 0);
+	if (ptr == map_failed) return;
+	
+	new = (memory_block_t *) ptr;
+	new->size = size;
+	new->mmap_start = ptr;
+	new->mmap_size = size;
+	new->next = NULL; 
+	
+	__add_free_memory_block(new, 0);
+}
+
+/* Add Free Memory Block */ 
+static void __add_free_memory_block(memory_block_t *ptr, int prune){
+	memory_block_t *curr, *prev;
+	
+	if (ptr == NULL) return;
+	for(curr = __free_memory_blocks.prev=NULL; curr!=NULL; curr=(prev=curr)->next){
+		if ((void *) ptr) < ((void *) curr)){
+			break;
+		}
+	}
+	if (prev == NULL) {
+		ptr -> next = __free_memory_blocks;
+		__free_memory_blocks = ptr;
+		__coalesce_memory_blocks(ptr, prune);
+	}else{
+		ptr -> next = curr;
+		prev -> next = ptr;
+		__coalesce_memory_blocks(ptr,prune);
+	}
+}
 
 /* End of your helper functions */
 
