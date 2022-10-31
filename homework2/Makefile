@@ -3,9 +3,13 @@ CC = gcc			# Designated Compiler
 CFLAGS = -fPIC -Wall -g -O0   	# Compiler Flags set
 
 # File dependencies
-implementation.o: implementation.c 
+implementation.o: implementation.c
+gcc -fPIC -Wall -g -O0 -c implementation.c
+
 memory.o: memory.c
-main.o: main.c
+	gcc -fPIC -Wall -g -O0 -c memory.c
+
+main.o: main.c implementation.c 
 
 # C Programs
 all: implementation memory test

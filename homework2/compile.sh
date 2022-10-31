@@ -1,7 +1,5 @@
-#!/bin/bash/
-
 # This bash script is used to help implement and test our implementation files.
-rm *o *.so  # Remove any files beforehand
+#rm *o *.so  # Remove any files beforehand
 
 gcc -fPIC -Wall -g -O0 -c memory.c
 gcc -fPIC -Wall -g -O0 -c implementation.c
