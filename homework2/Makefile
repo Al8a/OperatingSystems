@@ -1,29 +1,21 @@
 # Homework 2 Makefile
 CC = gcc			# Designated Compiler
-CFLAGS = -fPIC -Wall -g -O0   	# Compiler Flags set
+CFLAGS = -Wall -g -O0    	# Compiler Flags set
 
 # File dependencies
 implementation.o: implementation.c
-gcc -fPIC -Wall -g -O0 -c implementation.c
-
-memory.o: memory.c
-	gcc -fPIC -Wall -g -O0 -c memory.c
-
-main.o: main.c implementation.c 
+	gcc -fPIC -Wall -g -O0 -c implementation.c 
+memory.o: memory.c 
+	gcc -fPIC -Wall -g -O0 -c memory.c 
 
 # C Programs
-all: implementation memory test
+all: implementation memory
 
-implementation:  implementation.o
-	$(CC) $(CFLAGS) $@ $^
+implementation:  implementation.o 
+	$(CC) $(CFLAGS)  $@ $^
 
 memory: memory.o
 	$(CC) $(CFLAGS) $@ $^
-
-main:	main.o 
-	$(CC) $(CFLAGS) $@ $^
-
-
 
 run-impl: implementation
 	./implementation
@@ -31,9 +23,6 @@ run-impl: implementation
 run-mem: memory 
 	./memory
 
-run-main: main memory implementation
-	./main
-
 # Command to remove files generated on compilation 
 clean:
-	rm -f *.o *.c~ *.h~ *~ *.c# *.h# test main memory.so
+	rm -f *.o *.c~ *.h~ *~ *.c# *.h# memory.so
