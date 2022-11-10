@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -231,6 +230,8 @@ static int try_password(size_t *remainder, const char *str) {
 }
 
 
+
+
 /* Tries to crack the password compiled into 
 
    naivelogin
@@ -273,10 +274,34 @@ static int try_password(size_t *remainder, const char *str) {
    and returns 1.
 
 */
+
+
 int main(int argc, char **argv) {
+  char[] character_set = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$*_-+<>/"; // 75 available
+  char[] password = "................";
+  
+  size_t crack_cypher_attempt[1]; // remainder ((size_t) 0)
+  size_t previous_attempt = ((size_t) 0);
+  size_t next_cypher_option = 0;
+  *crack_cypher_attempt = ((size_t) 0);
 
-  // STUB, TODO
+  while(try_password(crack_cypher_attempt, previous_attempt)) {
+    if (*crack_cypher_attempt != previous_attempt) {
+      previous_attempt = *crack_cypher_attempt;
+      cypher_option = 0;
+    }
 
+    password[16-(previous_attempt-1)] = character_set[next_cypher_option++];
+    if (next_cypher_option > (strlen(character_set) - 1)) break;
+    fprintf("Cracked the password. The password is %s\n", password);
+    return 0;
+  }
+  
+    
+  
+  
+  fprintf(stderr,"Could not crack the password.\n", strerror(errno));
   return 1;
 }
+
 
