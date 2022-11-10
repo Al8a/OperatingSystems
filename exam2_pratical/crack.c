@@ -281,26 +281,25 @@ static int try_password(size_t *remainder, const char *str) {
 // return 1 - fail 
 int main(int argc, char **argv) {
   char character_set[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$*_-+<>/"; // 75 available
-  char password[] = "a..............."; // Since '.' not in character set fill as placeholder in 16 possible spots 
+  char password[] = "................"; // Since '.' not in character set fill as placeholder in 16 possible spots 
   
   size_t crack_cypher_attempt = ((size_t) 15); // remainder 
   size_t previous_attempt = ((size_t) 15);     // previous remainder 
-  short  next_cypher_option = 1; // character_set ref 
+  short  next_cypher_option = 0; // character_set ref 
   int tp_status; // type_password return value
 
-  
   while ((tp_status = try_password(&crack_cypher_attempt, password)) != 0) {
-    // Check if try_password() failed
+    // Check try_password() return value 
     if (tp_status == -1) {
       fprintf(stderr,"An error occurred.Cannot crack the password.Error: %s \n", strerror(errno));
       return 1;
     }
-    
+   
     if (crack_cypher_attempt != previous_attempt) {
       previous_attempt = crack_cypher_attempt;
       next_cypher_option = 0; // reset back to 0 index in char_set 
     }
-
+    // string comparison exploit  
     password[16-previous_attempt-1] = character_set[next_cypher_option++];
     // traversed through entire cypher options
     if (next_cypher_option > (strlen(character_set)-1)) {
@@ -308,15 +307,14 @@ int main(int argc, char **argv) {
       return 1;
     }
   }
-
-  // remove unused spaces 
+  // remove unused spaces in geenerated password
   for (char *ptr = password; *ptr != '\0'; ptr++) {
     if (*ptr == '.') {
       *ptr = '\0';
     }
   }
   // success 
-  printf("Cracked the password. The password is: %s \n", password);
+  printf("Cracked the password.The password is:%s\n", password);
   return 0;
 }
 
