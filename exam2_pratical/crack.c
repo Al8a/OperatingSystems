@@ -8,6 +8,11 @@
 
 #define NAIVELOGINEXECUTABLE "naivelogin"
 
+// Ochoa Alan
+// 80639123
+// Operating Systems
+// Practical portion of midterm II
+
 /* Wraps write(), calling it repeatedly until all count bytes have
    been written. 
 */
