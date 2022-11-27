@@ -13,9 +13,9 @@
   University of Texas at El Paso, Department of Computer Science.
 
   Contributors: Christoph Lauter
-                ... 
-                ... and
-                ...
+                Roxxanne White
+                Alan Ochoa and
+                Natasha Rovelli
 
   and based on 
 
@@ -237,7 +237,79 @@
 
 /* Helper types and functions */
 
-/* YOUR HELPER FUNCTIONS GO HERE */
+/* Memory Block Structure */
+struct __myfs_mem_block_struct_t{
+	size_t size;
+	size_t user_size;
+	__myfs_off_t next;
+};
+typedef struct __myfs_mem_block_struct_t __myfs_mem_block_t;
+
+/* Handle Structure */ 
+struct __myfs_handle_struct_t{
+	unit32_t magic;
+	__myfs_off_t free_mem;
+	__myfs_off_t root_dir;
+	size_t size;
+};
+typedef struct __myfs_handle_struct_t * __myfs_handle_t;
+
+/* types for inode entries */
+typedef enum __myfs_inode_type_enum_t __myfs_inode_type_t;
+enum __myfs_inode_type_enum_t{
+	DIRECTORY,
+	REG_FILE
+};
+
+typedef struct __myfs_inode_file_struct_t __myfs_inode_file_t;
+struct __myfs_inode_file_struct_t{
+	size_t size;
+	__myfs_off_t first_block;
+};
+
+/* File Block Structure */ 
+typedef struct __myfs_file_block_t __myfs_file_block_t;
+struct __myfs_file_block_t{
+	size_t size;
+	size_t allocated;
+	__myfs_off_t next;
+	__myfs_off_t data;
+};
+
+/* Directory Structure */ 
+typedef struct __myfs_inode_directory_struct_t __myfs_inode_directory_t;
+struct __myfs_inode_directory_struct_t{
+	size_t number_children;
+	__myfs_off_t children;
+};
+
+/* Default Values */ 
+#define MYFS_MAXIMUM_NAME_LENGTH (256)
+#define MYFS_STATIC_PATH_BYF_SIZE (8192)
+#define MYFS_TRUNCATE_SMALL_ALLOCATE ((size_t) 512)
+
+/* Incomplete */ 
+typedef struct __myfs_inode_struct_t __myfs_inode_t;
+struct __myfs_inode_struct_t{
+	__myfs_inode_type_t type;
+	char name[MYFS_MAXIMUM_NAME_LENGTH];
+	struct timespec times[2];
+	union {
+		__myfs_inode_file_t 
+		// incomplete
+    }
+}
+
+static __myfs_inode_t *__myfs_path_resolve(__myfs_handle_t handle, const char *path); 
+
+static __myfs_inode_t *__myfs_path_resolve_one_step(__myfs_handle_t handle, __myfs_inode_t *curr); //incomplete
+
+static void __myfs_set_filename(char *dest, const char *src){
+  dest[MYFS_MAXIMUM_NAME_LENGTH -1] = '/0';
+  strncpy(dest, src, MYFS_MAXIMUM_NAME_LENGTH -1);
+}
+
+static void __myfs_set_curr_time(); //incomplete 
 
 /* End of helper functions */
 
@@ -270,7 +342,25 @@
 int __myfs_getattr_implem(void *fsptr, size_t fssize, int *errnoptr,
                           uid_t uid, gid_t gid,
                           const char *path, struct stat *stbuf) {
-  /* STUB */
+  __myfs_handle_t handle;
+  __myfs_inode_t *node;
+  
+  handle = __myfs_get_handle(fsptr, fssize);
+  if (handle == NULL){
+	  errnoptr = EFAULT;
+	  return -1;
+  }
+  
+  node = __myfs_path_resolve(handle, path);
+  if (node == NULL){
+	  *errnoptr = ENOENT;
+	  return -1;
+  }
+  
+  memset(stbuf, 0, sizeof(struct stat));
+  //stbuf->st_uid 
+    // incomplete  
+  
   return -1;
 }
 
@@ -312,7 +402,18 @@ int __myfs_getattr_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_readdir_implem(void *fsptr, size_t fssize, int *errnoptr,
                           const char *path, char ***namesptr) {
-  /* STUB */
+  /* check handle 
+  resolve path, must be dir 
+  return # children, excluding . and .. (return 0) 
+  allocate array of pointers to chars using malloc calloc 
+  each child is a char * 
+  EINVAL 
+  copy strings 
+  free names 
+  return pointer to the array(of child arrays) we allocated 
+		must allocate array and each child array (main array has no \0, number should match children count)
+  */
+  
   return -1;
 }
 
@@ -335,7 +436,23 @@ int __myfs_readdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_mknod_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path) {
-  /* STUB */
+  char *parent, *newfile;
+  __myfs_handle_t handle;
+  __myfs_inode_t 
+  // incomplete 
+  __myfs_off_t tmp, tmp2;
+  __myfs_inode_t *new;
+  
+  // create file 
+  // check for name too long 
+  // check for slashes 
+  // allocate memory 
+  // if no memory say no space 
+  // new child in child's directory 
+  // if no space, free empty file again 
+  // reallocate 
+  // free 
+  
   return -1;
 }
 
@@ -353,7 +470,17 @@ int __myfs_mknod_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_unlink_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path) {
-  /* STUB */
+  // destroys a file 
+  /* if path = null, error 
+	get handle, if no file, error 
+	can not delete directory as regular file 
+	find the parent path, modify # kids 
+	if deleting name too long, error
+	can't delete file with slash
+	set current time of modification 
+	if no more kids deallocate kids array 
+	free memory */
+  
   return -1;
 }
 
@@ -374,7 +501,13 @@ int __myfs_unlink_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_rmdir_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path) {
-  /* STUB */
+  /* path null, error
+  can't do if empty 
+  can't find parent path error 
+  name too long error 
+  name has slash error 
+  free */
+  
   return -1;
 }
 
@@ -392,7 +525,11 @@ int __myfs_rmdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_mkdir_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path) {
-  /* STUB */
+  /* create dir inside dir 
+	if path null, error
+	already exists error 
+	no memory error */
+  
   return -1;
 }
 
@@ -436,7 +573,20 @@ int __myfs_rename_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_truncate_implem(void *fsptr, size_t fssize, int *errnoptr,
                            const char *path, off_t offset) {
-  /* STUB */
+  /* make file smaller or bigger 
+  smaller = byte removed 
+  bigger = 0's appended 
+  find handle
+  find node
+  if not file error
+  neg size error 
+  new size = old size, only set current time 
+  smaller, find block where to cut 
+  free memory 
+  bigger, allocate more space for 0s 
+  if can't use *2, or create new block, or 'no spaces left'
+  fill 0s using memset */
+  
   return -1;
 }
 
@@ -468,7 +618,11 @@ int __myfs_truncate_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_open_implem(void *fsptr, size_t fssize, int *errnoptr,
                        const char *path) {
-  /* STUB */
+  /* open file, check if file 
+  get handle 
+  get node 
+  return 0 */
+  
   return -1;
 }
 
@@ -489,7 +643,16 @@ int __myfs_open_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_read_implem(void *fsptr, size_t fssize, int *errnoptr,
                        const char *path, char *buf, size_t size, off_t offset) {
-  /* STUB */
+  /* read certain amt bytes out of file starting at offset 
+  find hande, node 
+  must be file 
+  must be positive integer, not beyond lengths of file 
+  read 0 bytes, give 0 
+  otherwise, find data blocks and copy from memory to read
+  memccpy
+  15 bytes out of 10, return 10 bytes
+  */
+  
   return -1;
 }
 
@@ -510,7 +673,13 @@ int __myfs_read_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_write_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path, const char *buf, size_t size, off_t offset) {
-  /* STUB */
+  /* write beyond file, at precicely the end, make file longer 
+  write middle of file, modify file
+  recycle truncate to make file right length 
+  write chunks to file 
+  memccpy from buffer to file
+  free */ 
+  
   return -1;
 }
 
@@ -529,7 +698,11 @@ int __myfs_write_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_utimens_implem(void *fsptr, size_t fssize, int *errnoptr,
                           const char *path, const struct timespec ts[2]) {
-  /* STUB */
+  /* get handle
+  get path
+  change node times 
+  */
+  
   return -1;
 }
 
@@ -558,7 +731,13 @@ int __myfs_utimens_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_statfs_implem(void *fsptr, size_t fssize, int *errnoptr,
                          struct statvfs* stbuf) {
-  /* STUB */
+  /* get handle
+  how many blocks are our size 1024(1 byte, can use other sizes)
+  blocks = systemsize/ size 
+  free blocks 
+  available blocks 
+  name max length */ 
+  
   return -1;
 }
 
