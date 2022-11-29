@@ -237,35 +237,70 @@
 
 /* Helper types and functions */
 
-/* Memory Block Structure */
-struct __myfs_mem_block_struct_t{
+// Macros ------------------------------------------
+#define MYFS_MAXIMUM_NAME_LENGTH (256)
+#define MYFS_STATIC_PATH_BYF_SIZE (8192)
+#define MYFS_TRUNCATE_SMALL_ALLOCATE ((size_t) 512)
+#define MYFS_MAGIC ((uint32_t) (UINT32_C(OxCAFEBABE)))
+
+
+
+// Offsets  ----------------------------------------
+typedef size_t __myfs_off_t;
+
+static inline void * offset_to_ptr(void *fsptr, __myfs_off_t off) {
+      if (off == ((__myfs_off_t) 0)) return NULL;
+      return fsptr + off;
+}
+
+
+static inline __myfs_off_t ptr_to_offset(void *fsptr, void *ptr) {
+      if (ptr == NULL) return ((__myfs_off_t)0);
+      if (ptr <= fsptr) return ((__myfs_off_t)0);
+      return (__myfs_off_t)(ptr - fsptr);
+}
+// ----------------------------------------------
+
+
+
+// Memory block structure -------------------------
+struct __myfs_mem_block_struct_t {
 	size_t size;
 	size_t user_size;
 	__myfs_off_t next;
 };
-typedef struct __myfs_mem_block_struct_t __myfs_mem_block_t;
+typedef struct __myfs_mem_block_struct_t *__myfs_handle_t;
 
-/* Handle Structure */ 
-struct __myfs_handle_struct_t{
-	unit32_t magic;
-	__myfs_off_t free_mem;
+
+
+// Handler structure -------------------------
+struct __myfs_handle_struct_t {
+	uint32_t magic;
+	__myfs_off_t free_memory;
 	__myfs_off_t root_dir;
 	size_t size;
 };
-typedef struct __myfs_handle_struct_t * __myfs_handle_t;
+typedef struct __myfs_handle_struct_t *__myfs_handle_t;
+
+
 
 /* types for inode entries */
 typedef enum __myfs_inode_type_enum_t __myfs_inode_type_t;
-enum __myfs_inode_type_enum_t{
+enum __myfs_inode_type_enum_t {
 	DIRECTORY,
 	REG_FILE
 };
 
+
+
+/* inode file */
 typedef struct __myfs_inode_file_struct_t __myfs_inode_file_t;
-struct __myfs_inode_file_struct_t{
+struct __myfs_inode_file_struct_t {
 	size_t size;
 	__myfs_off_t first_block;
 };
+
+
 
 /* File Block Structure */ 
 typedef struct __myfs_file_block_t __myfs_file_block_t;
@@ -276,6 +311,8 @@ struct __myfs_file_block_t{
 	__myfs_off_t data;
 };
 
+
+
 /* Directory Structure */ 
 typedef struct __myfs_inode_directory_struct_t __myfs_inode_directory_t;
 struct __myfs_inode_directory_struct_t{
@@ -283,26 +320,24 @@ struct __myfs_inode_directory_struct_t{
 	__myfs_off_t children;
 };
 
-/* Default Values */ 
-#define MYFS_MAXIMUM_NAME_LENGTH (256)
-#define MYFS_STATIC_PATH_BYF_SIZE (8192)
-#define MYFS_TRUNCATE_SMALL_ALLOCATE ((size_t) 512)
+
 
 /* Incomplete */ 
 typedef struct __myfs_inode_struct_t __myfs_inode_t;
-struct __myfs_inode_struct_t{
+struct __myfs_inode_struct_t {
 	__myfs_inode_type_t type;
 	char name[MYFS_MAXIMUM_NAME_LENGTH];
 	struct timespec times[2];
 	union {
-		__myfs_inode_file_t 
+		__myfs_inode_file_t file;
+            __myfs_inode_directory_t directory;
 		// incomplete
-    }
-}
+      } type;
+} 
 
-static __myfs_inode_t *__myfs_path_resolve(__myfs_handle_t handle, const char *path); 
 
-static __myfs_inode_t *__myfs_path_resolve_one_step(__myfs_handle_t handle, __myfs_inode_t *curr); //incomplete
+static __myfs_inode_t * __myfs_path_resolve(__myfs_handle_t handle, const char *path); 
+static __myfs_inode_t * __myfs_path_resolve_one_step(__myfs_handle_t handle, __myfs_inode_t *curr, const char *path); //incomplete
 
 static void __myfs_set_filename(char *dest, const char *src){
   dest[MYFS_MAXIMUM_NAME_LENGTH -1] = '/0';
@@ -346,21 +381,25 @@ int __myfs_getattr_implem(void *fsptr, size_t fssize, int *errnoptr,
   __myfs_inode_t *node;
   
   handle = __myfs_get_handle(fsptr, fssize);
+  
   if (handle == NULL){
 	  errnoptr = EFAULT;
 	  return -1;
   }
   
   node = __myfs_path_resolve(handle, path);
+
   if (node == NULL){
 	  *errnoptr = ENOENT;
 	  return -1;
   }
   
   memset(stbuf, 0, sizeof(struct stat));
-  //stbuf->st_uid 
-    // incomplete  
   
+  stbuf->st_uid = uid; 
+  stbuf->st_gid = gid;
+  // still incomplete
+
   return -1;
 }
 
@@ -414,6 +453,27 @@ int __myfs_readdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 		must allocate array and each child array (main array has no \0, number should match children count)
   */
   
+  __myfs_handle_t handle;
+  __myfs_inode_t *node;
+  char **names;
+  size_t i,k;
+  off_t *kids;
+  //inode_t *tmp; UNSURE IF ACTUALLY INODE_T 
+  char *name; 
+
+  //names = calloc(node->value.directory, number_children, sizeof(char*));
+  
+  if (names == NULL) {
+      errnoptr = EINVAL;
+      return -1;
+  }
+
+  //kids = (myfs_offset_t *)
+
+
+
+ // name = strdup(tmp->name);
+ // if (name == NULL)  
   return -1;
 }
 
@@ -438,11 +498,38 @@ int __myfs_mknod_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path) {
   char *parent, *newfile;
   __myfs_handle_t handle;
-  __myfs_inode_t 
-  // incomplete 
-  __myfs_off_t tmp, tmp2;
+  __myfs_off_t *node, prev;
   __myfs_inode_t *new;
+  //__myfs_off_t 
   
+  if (path == NULL) {
+      *errnoptr = ENOENT;
+      return -1;
+  }
+
+  parent = NULL;
+  newfile = NULL;
+
+  if (node->type != DIR) {
+      free(parent);
+      free(newfile);
+  }
+
+
+  if (prev != NULL) {
+
+  }
+
+  if (strlen(newfile) > MYFS_MAXIMUM_NAME_LENGTH) {
+
+  }
+
+  if (strchr(newfile , '/')!= NULL) {
+
+  }
+
+
+  new = (__myfs_inode_t*) __myfs_offset_to_ptr; 
   // create file 
   // check for name too long 
   // check for slashes 
@@ -480,7 +567,35 @@ int __myfs_unlink_implem(void *fsptr, size_t fssize, int *errnoptr,
 	set current time of modification 
 	if no more kids deallocate kids array 
 	free memory */
-  
+
+      if (path == NULL) {
+            *errnoptr = ENOENT;
+            return -1;
+      }
+
+      handle = get_handle();
+      
+      if (handle = NULL) {
+            errnoptr = EFAULT;
+            return -1;
+      }
+
+      node = __myfs_path_resolve
+      if (node->type != something) {
+      
+      }
+
+
+      //myfs_cut_path_parent_address_base
+      if (parent == NULL){}
+      if (strchr(newfile , '/')!= NULL) {
+            free(parent);
+            free(file);
+            *errnoptr = ENOTDIR;
+            return -1;
+      }
+
+      //if (node_off ==)
   return -1;
 }
 
@@ -507,7 +622,14 @@ int __myfs_rmdir_implem(void *fsptr, size_t fssize, int *errnoptr,
   name too long error 
   name has slash error 
   free */
+    __myfs_handle_t handle;
+    //__myfs_inode_t *node,
+    // path = NULL;
+    // handler = NULL
+    // node = NULL 
   
+    //  if (node->value)
+
   return -1;
 }
 
@@ -529,8 +651,12 @@ int __myfs_mkdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 	if path null, error
 	already exists error 
 	no memory error */
+      
+      char *parent, *newDir;
+      __myfs_handle_t handle;
+      __myfs_inode_t *node;
   
-  return -1;
+      return -1;
 }
 
 /* Implements an emulation of the rename system call on the filesystem 
@@ -551,6 +677,8 @@ int __myfs_mkdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_rename_implem(void *fsptr, size_t fssize, int *errnoptr,
                          const char *from, const char *to) {
+      __myfs_handle_t handle;
+      __myfs_inode_t *fromNode, *fromDir;
   /* STUB */
   return -1;
 }
@@ -587,6 +715,24 @@ int __myfs_truncate_implem(void *fsptr, size_t fssize, int *errnoptr,
   if can't use *2, or create new block, or 'no spaces left'
   fill 0s using memset */
   
+  __myfs_handle_t handle;
+  __myfs_inode_t *node;
+  //size_t size;
+  //off_t off
+  handle = __myfs_get_handle(fsptr,fssize);
+  node = __myfs_path_resolve();
+
+      // (node == null) 
+      // node->type != REG_FILE
+
+      //new_size = (size_t) offset;
+      // off = (off_t) realSize;
+      // if (off != offset){} 
+
+      // alloc = new_size;
+      // ms = allocate_mem
+
+      // memset(ms,struct,0,ms_len)
   return -1;
 }
 
@@ -623,6 +769,15 @@ int __myfs_open_implem(void *fsptr, size_t fssize, int *errnoptr,
   get node 
   return 0 */
   
+  __myfs_handle_t handle;
+  __myfs_inode_t *node;
+
+  handle = __myfs_get_handle == NULL;
+  if (handle == NULL) {
+      *errnoptr = EFAULT;
+      return -1;
+  }
+
   return -1;
 }
 
@@ -652,7 +807,26 @@ int __myfs_read_implem(void *fsptr, size_t fssize, int *errnoptr,
   memccpy
   15 bytes out of 10, return 10 bytes
   */
+
+      int res;
+      //__myfs_handle_t
+      //size_t off,cpy;
+      //off_t
+      //void *
   
+      res = -1;
+      //handle = __myfs_get_handle() 
+
+      //sizeof(off_t <  sizeof(size_t))
+      //if (offset >=((off_t) (node->file_size)) 
+      //else 
+
+
+      // cpy 
+      // memcpy(buf + already_read, mc_start, mc_len)
+      // already_read += mc_len;
+      // to_read -= mc_len;
+
   return -1;
 }
 
@@ -680,6 +854,20 @@ int __myfs_write_implem(void *fsptr, size_t fssize, int *errnoptr,
   memccpy from buffer to file
   free */ 
   
+  // Professor suggested a recycling of truncate to use for write 
+
+      int res;
+      __myfs_handle_t handle;
+      __myfs_inode_t *node;
+      //size_t off, minSize
+
+      //if (node->value file_size < minSize)
+      //mc_start = __myfs_offset_to_ptr(handle, ((__myfs_file_block_t *) __myfs_offset_to_ptr(handle,curr))->data);
+      //mc_len
+
+
+
+  
   return -1;
 }
 
@@ -702,8 +890,16 @@ int __myfs_utimens_implem(void *fsptr, size_t fssize, int *errnoptr,
   get path
   change node times 
   */
-  
-  return -1;
+ __myfs_handle_t handle;
+ __myfs_inode_t *node;
+
+ handle = __myfs_get_handle(fsptr, fssize);
+ node = __myfs_path_resolve(fsptr, path);
+ 
+ node->time[0] = ts[0];
+ node->time[1] = ts[1];
+
+ return 0;   
 }
 
 /* Implements an emulation of the statfs system call on the filesystem 
@@ -737,7 +933,22 @@ int __myfs_statfs_implem(void *fsptr, size_t fssize, int *errnoptr,
   free blocks 
   available blocks 
   name max length */ 
+
+  __myfs_handle_t handle;
+  handle = __myfs_get_handle(fsptr,fssize);
   
-  return -1;
+  if (handle == NULL) {
+      errnoptr = EFAULT;
+      return -1;
+  }
+  
+  memset(stbuf,0,sizeof(struct statvfs));
+
+  stbuf->f_bsize;
+  stbuf->f_blocks = fsblkcnt_t( (handle->size) / ((size_t stbuf->f_bsize) /* SOMETHING MISSING HERE */ );
+  // stbuf->f_bfree(fsblkcnt_t(( /*var*/ ((a_size)), ((size_t stbuf->f_bsize));
+  stbuf->f_bavail = stbuf->f_bfree;
+  stbuf->f_namemax = (unsigned long) MYFS_MAXIMUM_NAME_LENGTH; 
+  return 0;
 }
 
