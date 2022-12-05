@@ -1,5 +1,4 @@
 /*
-
   MyFS: a tiny file-system written for educational purposes
 
   MyFS is 
@@ -12,10 +11,11 @@
 
   University of Texas at El Paso, Department of Computer Science.
 
-  Contributors: Christoph Lauter
-                Roxxanne White
-                Alan Ochoa and
+  Contributors: Christoph Lauter,
+                Alan Ochoa 
+                Roxxanne White and
                 Natasha Rovelli
+
 
   and based on 
 
@@ -41,6 +41,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
+#include "implementation.h"
 
 
 /* The filesystem you implement must support all the 13 operations
@@ -235,116 +236,410 @@
 
 */
 
-/* Helper types and functions */
-
-// Macros ------------------------------------------
-#define MYFS_MAXIMUM_NAME_LENGTH (256)
-#define MYFS_STATIC_PATH_BYF_SIZE (8192)
-#define MYFS_TRUNCATE_SMALL_ALLOCATE ((size_t) 512)
-#define MYFS_MAGIC ((uint32_t) (UINT32_C(OxCAFEBABE)))
-
-
-
-// Offsets  ----------------------------------------
-typedef size_t __myfs_off_t;
-
-static inline void * offset_to_ptr(void *fsptr, __myfs_off_t off) {
-      if (off == ((__myfs_off_t) 0)) return NULL;
+/* YOUR HELPER FUNCTIONS GO HERE */
+static inline void * offset_to_ptr(void *fsptr, __myfs_offset_t off) {
+      if (off == ((__myfs_offset_t) 0)) return NULL;
       return fsptr + off;
 }
 
 
-static inline __myfs_off_t ptr_to_offset(void *fsptr, void *ptr) {
-      if (ptr == NULL) return ((__myfs_off_t)0);
-      if (ptr <= fsptr) return ((__myfs_off_t)0);
-      return (__myfs_off_t)(ptr - fsptr);
-}
-// ----------------------------------------------
-
-
-
-// Memory block structure -------------------------
-struct __myfs_mem_block_struct_t {
-	size_t size;
-	size_t user_size;
-	__myfs_off_t next;
-};
-typedef struct __myfs_mem_block_struct_t *__myfs_handle_t;
-
-
-
-// Handler structure -------------------------
-struct __myfs_handle_struct_t {
-	uint32_t magic;
-	__myfs_off_t free_memory;
-	__myfs_off_t root_dir;
-	size_t size;
-};
-typedef struct __myfs_handle_struct_t *__myfs_handle_t;
-
-
-
-/* types for inode entries */
-typedef enum __myfs_inode_type_enum_t __myfs_inode_type_t;
-enum __myfs_inode_type_enum_t {
-	DIRECTORY,
-	REG_FILE
-};
-
-
-
-/* inode file */
-typedef struct __myfs_inode_file_struct_t __myfs_inode_file_t;
-struct __myfs_inode_file_struct_t {
-	size_t size;
-	__myfs_off_t first_block;
-};
-
-
-
-/* File Block Structure */ 
-typedef struct __myfs_file_block_t __myfs_file_block_t;
-struct __myfs_file_block_t{
-	size_t size;
-	size_t allocated;
-	__myfs_off_t next;
-	__myfs_off_t data;
-};
-
-
-
-/* Directory Structure */ 
-typedef struct __myfs_inode_directory_struct_t __myfs_inode_directory_t;
-struct __myfs_inode_directory_struct_t{
-	size_t number_children;
-	__myfs_off_t children;
-};
-
-
-
-/* Incomplete */ 
-typedef struct __myfs_inode_struct_t __myfs_inode_t;
-struct __myfs_inode_struct_t {
-	__myfs_inode_type_t type;
-	char name[MYFS_MAXIMUM_NAME_LENGTH];
-	struct timespec times[2];
-	union {
-		__myfs_inode_file_t file;
-            __myfs_inode_directory_t directory;
-		// incomplete
-      } type;
-} 
-
-
-static __myfs_inode_t * __myfs_path_resolve(__myfs_handle_t handle, const char *path); 
-static __myfs_inode_t * __myfs_path_resolve_one_step(__myfs_handle_t handle, __myfs_inode_t *curr, const char *path); //incomplete
-
-static void __myfs_set_filename(char *dest, const char *src){
-  dest[MYFS_MAXIMUM_NAME_LENGTH -1] = '/0';
-  strncpy(dest, src, MYFS_MAXIMUM_NAME_LENGTH -1);
+static inline __myfs_offset_t ptr_to_offset(void *fsptr, void *ptr) {
+      if (ptr == NULL) return ((__myfs_offset_t)0);
+      if (ptr <= fsptr) return ((__myfs_offset_t)0);
+      return (__myfs_offset_t)(ptr - fsptr);
 }
 
-static void __myfs_set_curr_time(); //incomplete 
+
+
+static __myfs_inode_t *__myfs_path_resolve(__myfs_handle_t handle, const char *path);
+
+
+//static __myfs_inode_t * __myfs_path_resolve_one_step(__myfs_handle_t handle, __myfs_inode_t *curr, int *errnoptr); //incomplete
+
+/*
+static void __myfs_set_filename(char *dst, const char *src) {
+  dst[MYFS_MAXIMUM_NAME_LENGTH -1] = '\0';
+  strncpy(dest, src, MYFS_MAXIMUM_NAME_LENGTH - 1);
+}
+*/
+
+static void __myfs_set_curr_time(__myfs_inode_t *node, int modified_flag) {
+    if (node == NULL) {
+      return;
+    }
+
+    struct timespec ts;
+    /*  Retrieve time of the specified clock clk_id */
+    if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
+        node->times[0] = ts;
+        if (modified_flag) {
+            node->times[1] = ts;
+        }
+    }
+}
+
+
+static __myfs_handle_t  __myfs_get_handle(void *fsptr, size_t size) {
+  __myfs_handle_t handle;
+  size_t s;
+  struct __myfs_mem_block_struct_t *block;
+
+  if (size < sizeof(struct __myfs_handle_struct_t)) return NULL;
+  handle = (__myfs_handle_t) fsptr;
+  if (handle->magic != MYFS_MAGIC) {
+      s = size - sizeof(struct __myfs_handle_struct_t);
+      if (handle->magic != ((uint32_t) 0)) {
+        memset(fsptr + sizeof(struct __myfs_handle_struct_t),0,s);
+      }
+      handle->magic = MYFS_MAGIC;
+      handle->size = s;
+      handle->root_dir = (offset_t) 0;
+  }
+  return handle;
+}
+
+
+
+
+// Returns 1 if the given inode is for a directory, else 0
+/*
+    union {
+        __myfs_inode_file_t file; == 0
+        __myfs_inode_directory_t directory; == 1
+    } type;
+
+static int inode_isdir( __myfs_inode_t inode) {
+    __myfs_inode_struct_t *node;
+    node = inode;
+    if (node->type == 0) {
+      return 0;
+    } else {
+        return 1;
+    }
+}
+*/
+static void __myfs_set_filename(char *dst, const char *src){
+    // Sets the file or directory name (of length sz) for the given inode.
+    return - 1;
+}
+
+// Returns 1 unless ch is one of the following illegal naming chars:
+// '{' , '}', '|', '~', 'DEL', ':', '/', '\', and ','
+static int inode_name_charvalid(char ch) {
+    return  (!(ch < 32 || ch == 44 || ch == 95 || ch  == 47 || ch == 58 || ch > 122));
+}
+
+
+// Returns 1 iff name is legal ascii chars and within max length, else 0.
+static int inode_name_isvalid(char *name) {
+    int len = 0;
+
+    for (char *c = name; *c != '\0'; c++) {
+        len++;
+        if (len > MYFS_MAXIMUM_NAME_LENGTH) return 0;            // Check for over max length
+        if (!inode_name_charvalid(*c)) return 0;    // Check for illegal chars
+    }
+
+    if (len == 0) return 0;  // Zero length is invalid
+    return 1;                // Valid
+}
+
+
+/* If size is zero, return NULL. Otherwise, call get_allocation with the designated passed size. */
+void *__malloc_impl(void *fsptr, void *ptr, size_t *size) {
+  if (size == ((size_t) 0)) return NULL;
+  if (ptr == NULL) {
+    ptr = fsptr + sizeof(size_t);
+  }
+  return get_allocation(fsptr, get_free_memory_ptr(fsptr), ptr - sizeof(size_t), size);
+}
+
+
+
+/* If size is less than what already assign to *ptr just lock what is after size and add it using add_allocation_space. */
+void *__realloc_impl(void *fsptr, void *ptr, size_t *size) {
+  if (*size == ((size_t) 0)) {
+    __free_impl(fsptr, ptr);
+    return NULL;
+  }
+  linkedList *LL = get_free_memory_ptr(fsptr);
+  if (ptr == fsptr) {
+    return get_allocation(fsptr, LL, fsptr, size);
+  }
+  s_allocation *allocation = (s_allocation *) (((void *) ptr) - sizeof(size_t));
+  s_allocation *temp_allocation;
+  void *new_ptr = NULL;
+  if ((allocation->remaining_memory >= *size) && (allocation->remaining_memory < (*size + sizeof(s_allocation))) ) {
+    new_ptr = ptr;
+  }
+  else if (allocation->remaining_memory > *size) {
+    temp_allocation = (s_allocation *) (ptr + *size);
+    temp_allocation->remaining_memory = allocation->remaining_memory - *size - sizeof(size_t);
+    temp_allocation->next_space = 0; 
+    add_allocation_space(fsptr, LL, temp_allocation);
+    allocation->remaining_memory = *size;
+    new_ptr = ptr;
+  }
+  else {
+    new_ptr = get_allocation(fsptr, LL, fsptr, size);
+    if (*size != 0) {
+      return NULL;
+    }
+    memcpy(new_ptr, ptr, allocation->remaining); 
+    add_allocation_space(fsptr, LL, allocation);
+  }
+  return new_ptr;
+}
+
+
+/* Add space back to List using add_allocation_space */
+void __free_impl(void *fsptr, void *ptr)
+{
+  if (ptr == NULL) return;
+  add_allocation_space(fsptr, get_free_memory_ptr(fsptr), ptr - sizeof(size_t));
+}
+
+/* Make an s_Allocation item using length and start and add it to the list which does it in ascending order */
+void add_allocation_space(void *fsptr, List *LL, s_Allocation *alloc)
+{
+  s_Allocation *temp;
+  __myfs_off_t temp_off = LL->first_space;
+  __myfs_off_t alloc_off = ptr_to_off(fsptr, alloc);
+
+  //New space address is less than the first_space in LL
+  if (temp_off > alloc_off) {
+    /* At this point we know that alloc comes before LL->first_space */
+    LL->first_space = alloc_off; //Update first space
+    //Check if we can merge LL->first_space and alloc
+    if ( (alloc_off + sizeof(size_t) + alloc->remaining) == temp_off ) {
+      //Get first pointer
+      temp = off_to_ptr(fsptr, temp_off);
+      //Combine the spaces available
+      alloc->remaining += sizeof(size_t) + temp->remaining;
+      //Update pointers
+      alloc->next_space = temp->next_space;
+    }
+    //We couldn't merge so we just add it as the first_space and update pointers
+    else {
+      alloc->next_space = temp_off;
+    }
+  }
+  //Find after what pointer does alloc should be added
+  else {
+    temp = off_to_ptr(fsptr, temp_off);
+    //Get the last pointer that is in lower memory than alloc
+    while ( (temp->next_space != 0) && (temp->next_space < alloc_off) ) {
+      temp = off_to_ptr(fsptr, temp->next_space);
+    }
+    temp_off = ptr_to_off(fsptr, temp);
+
+    //At this point, temp_off < alloc_off < temp->next_space. But, there is no guaranty that temp->next_space != 0 (NULL)
+
+    //If temp->next_space != 0 we make alloc_off to point to it and try to merge them
+    __myfs_off_t after_alloc_off = temp->next_space;
+    if (after_alloc_off != 0) {
+      //Check if we can merge alloc and after_alloc
+      if ( (alloc_off + sizeof(size_t) + alloc->remaining) == after_alloc_off ) {
+        s_Allocation *after_alloc = off_to_ptr(fsptr, after_alloc_off);
+        alloc->remaining += sizeof(size_t) + after_alloc->remaining;
+        alloc->next_space = after_alloc->next_space;
+      }
+      //We couldn't merge them
+      else {
+        alloc->next_space = after_alloc_off;
+      }
+    }
+    //alloc is the last space available in memory ascending order
+    else {
+      alloc->next_space = 0;
+    }
+    //Try to merge temp and alloc
+    if ( (temp_off + sizeof(size_t) + temp->remaining) == alloc_off ) {
+      temp->remaining += sizeof(size_t) + alloc->remaining;
+      temp->next_space = alloc->next_space;
+    }
+    //We couldn't merge them
+    else {
+      temp->next_space = alloc_off;
+    }
+  }
+}
+
+/* Check if the offset for pref_ptr is 0, if so we get any block for size, otherwise we try to find the block after it and get as much from
+ * it as possible and get the rest from the largest block
+ */
+void *get_allocation(void *fsptr, linkedList *LL, s_allocation *org_pref, size_t *size)
+{
+  //There is no guarantee that its offset is not 0, if so, we don't consider it
+  __myfs_off_t pref_off = ((__myfs_off_t) 0);
+  s_Allocation *before_pref = NULL;
+  int pref_found = 0;
+
+  //Before current space
+  __myfs_off_t before_temp_off;
+  s_Allocation *before_temp;
+
+  //current space
+  __myfs_off_t temp_off;
+  s_Allocation *temp;
+
+  //Largest block variables
+  s_Allocation *before_largest = NULL;
+  __myfs_off_t largest_off;
+  s_Allocation *largest;
+  size_t largest_size;
+
+  //Use this ptr if a new block needs to be return
+  s_Allocation *ptr = NULL;
+
+  //Save first space
+  before_temp_off = LL->first_space;
+
+  //If before_temp have an offset of zero we have use all possible space in memory
+  if (!before_temp_off) {
+    return NULL;
+  }
+
+  if (((void *) org_pref) != fsptr) {
+    pref_off = ptr_to_off(fsptr, org_pref) + org_pref->remaining_memory;
+    //Check that the first block is the prefer one or not
+    if (pref_off == before_temp_off) {
+      pref_found = 1;
+    }
+  }
+
+  //We currently have before_temp as our largest block
+  before_temp = off_to_ptr(fsptr, before_temp_off);
+
+  largest_off = before_temp_off;
+  largest = before_temp;
+  largest_size = before_temp->remaining_memory;
+
+  //Get next space
+  temp_off = before_temp->next_space;
+
+  //Check that size is at least a sizeof(__myfs_off_t)
+  if (*size < sizeof(__myfs_offset_t)) {
+    *size = sizeof(__myfs_offset_t);
+  }
+
+  //Iterate the list until the first block that can hold size and the block after pref_ptr is found (or pass because it is not there)
+  while (temp_off != ((__myfs_offset_t) 0)) {
+    //The offset is to get after the size_t so we readjust it
+    temp = off_to_ptr(fsptr, temp_off);
+    //Check if temp_off is the prefer block that we are looking for or if temp have more space available than the previous largest
+    if ( (pref_off == temp_off) || (temp->remaining_memory > largest_size) ) {
+      //If temp_off is pref we would not like to update largest space so we have two places to get space from
+      if (pref_off == temp_off) {
+        //pref_found was successfully found
+        //TODO: extend_pref_block();
+        pref_found = 1;
+        before_pref = before_temp;
+      }
+      //Update largest space
+      else {
+        before_largest = before_temp;
+        largest_off = temp_off;
+        largest = temp;
+        largest_size = temp->remaining_memory;
+      }
+    }
+    //Update pointers to next space
+    before_temp_off = temp_off;
+    before_temp = temp;
+    temp_off = temp->next_space;
+  }
+
+  //If the prefer block was found we get as much as we can from it until size or until we run out of bytes available from it
+  if (pref_found) {
+    s_Allocation *pref = off_to_ptr(fsptr, pref_off);
+    //Check if you can get all size bytes from the prefer block
+    if (pref->remaining_memory >= *size) {
+      //Check if we can make an s_Allocation object with the remaining space
+      if (pref->remaining_memory > *size + sizeof(s_Allocation)) {
+        //Set original pref with final total size
+        org_pref->remaining_memory += *size;
+        //Make the new s_Allocation object
+        temp = ((void *) pref) + *size;
+        temp->remaining_memory = pref->remaining_memory - *size;
+        temp->next_space = pref->next_space;
+        //Update pointers to add temp into list of free blocks
+        before_pref->next_space = pref_off + *size;
+      }
+      //We can't make an s_Allocation object
+      else {
+        //Add everything that the prefer block have into the original one
+        org_pref->remaining_memory += pref->remaining_memory;
+        //Update pointers so the one that was pointing to the prefer free block is now pointing to the next free
+        before_pref->next_space = pref->next_space;
+      }
+      *size = ((__myfs_offset_t) 0);
+    }
+    //We couldn't got everything from the prefer block so we get as much as we can from it
+    else {
+      //Add everything that the prefer block have into the original one
+      org_pref->remaining_memory += pref->remaining_memory;
+      //Update pointers so the one that was pointing to the prefer free block is now pointing to the next free
+      before_pref->next_space = pref->next_space;
+      //Update size because we have gotten some space
+      *size -= pref->remaining_memory;
+    }
+  }
+
+  //If size is still not 0 we get as much as we can from it or until size is 0
+  if ( (*size != ((__myfs_offset_t) 0)) && (largest != NULL) ) {
+    ptr = largest;
+    //Check if the largest block can give everything that we are missing
+    if (largest->remaining_memory >= *size) {
+      //Check if we can make an s_Allocation object after getting size bytes from it
+      if (largest->remaining_memory > *size + sizeof(s_Allocation)) {
+        //Make the new s_Allocation object
+        temp = ((void *) largest) + sizeof(size_t) + *size; //
+        temp->remaining_memory = largest->remaining_memory - *size - sizeof(size_t);
+        temp->next_space = largest->next_space;
+        //Update before_largest pointer, it may be the LL or a s_Allocation
+        if (before_largest == NULL) {
+          //before_largest is the LL
+          LL->first_space = largest_off + *size + sizeof(size_t);
+        }
+        else {
+          //Update pointers to add temp list of free blocks
+          before_largest->next_space = largest_off + *size + sizeof(size_t);
+        }
+        //Set original pref with final total size
+        ptr->remaining_memory = *size;
+      }
+      //We can't make an s_Allocation object so we get everything
+      else {
+        //Use everything that the largest block have
+        if (before_largest != NULL) {
+          before_largest->next_space = largest->next_space;
+        }
+        else {
+          //Because largest is the first block and we use everything, it means that the system have no memory left
+          LL->first_space = ((__myfs_offset_t) 0);
+        }
+      }
+      *size = ((__myfs_offset_t) 0);
+    }
+    //We couldn't got everything from the largest block so we get as much as we can from it
+    else {
+      //Update pointers
+      if (before_largest == NULL) {
+        //We had use everything and we still didn't got enough size
+        return NULL;
+      }
+      else {
+        before_largest->next_space = largest->next_space;
+        //Update size
+        *size -= largest->remaining_memory;
+      }
+    }
+  }
+  //We suppose to return the new block address if a new block outside the prefer one was needed
+  return ((void *) ptr) + sizeof(size_t); //ptr was set to the largest which is at the size_t header so we resize
+}
+
 
 /* End of helper functions */
 
@@ -370,36 +665,14 @@ static void __myfs_set_curr_time(); //incomplete
                 (including . and ..),
                 1 for files)
    st_size     (supported only for files, where it is the real file size)
-   st_atim
-   st_mtim
+   st_atime
+   st_mtime
 
 */
 int __myfs_getattr_implem(void *fsptr, size_t fssize, int *errnoptr,
                           uid_t uid, gid_t gid,
                           const char *path, struct stat *stbuf) {
-  __myfs_handle_t handle;
-  __myfs_inode_t *node;
-  
-  handle = __myfs_get_handle(fsptr, fssize);
-  
-  if (handle == NULL){
-	  errnoptr = EFAULT;
-	  return -1;
-  }
-  
-  node = __myfs_path_resolve(handle, path);
-
-  if (node == NULL){
-	  *errnoptr = ENOENT;
-	  return -1;
-  }
-  
-  memset(stbuf, 0, sizeof(struct stat));
-  
-  stbuf->st_uid = uid; 
-  stbuf->st_gid = gid;
-  // still incomplete
-
+                           
   return -1;
 }
 
@@ -441,39 +714,7 @@ int __myfs_getattr_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_readdir_implem(void *fsptr, size_t fssize, int *errnoptr,
                           const char *path, char ***namesptr) {
-  /* check handle 
-  resolve path, must be dir 
-  return # children, excluding . and .. (return 0) 
-  allocate array of pointers to chars using malloc calloc 
-  each child is a char * 
-  EINVAL 
-  copy strings 
-  free names 
-  return pointer to the array(of child arrays) we allocated 
-		must allocate array and each child array (main array has no \0, number should match children count)
-  */
-  
-  __myfs_handle_t handle;
-  __myfs_inode_t *node;
-  char **names;
-  size_t i,k;
-  off_t *kids;
-  //inode_t *tmp; UNSURE IF ACTUALLY INODE_T 
-  char *name; 
-
-  //names = calloc(node->value.directory, number_children, sizeof(char*));
-  
-  if (names == NULL) {
-      errnoptr = EINVAL;
-      return -1;
-  }
-
-  //kids = (myfs_offset_t *)
-
-
-
- // name = strdup(tmp->name);
- // if (name == NULL)  
+  /* STUB */
   return -1;
 }
 
@@ -496,50 +737,7 @@ int __myfs_readdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_mknod_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path) {
-  char *parent, *newfile;
-  __myfs_handle_t handle;
-  __myfs_off_t *node, prev;
-  __myfs_inode_t *new;
-  //__myfs_off_t 
-  
-  if (path == NULL) {
-      *errnoptr = ENOENT;
-      return -1;
-  }
-
-  parent = NULL;
-  newfile = NULL;
-
-  if (node->type != DIR) {
-      free(parent);
-      free(newfile);
-  }
-
-
-  if (prev != NULL) {
-
-  }
-
-  if (strlen(newfile) > MYFS_MAXIMUM_NAME_LENGTH) {
-
-  }
-
-  if (strchr(newfile , '/')!= NULL) {
-
-  }
-
-
-  new = (__myfs_inode_t*) __myfs_offset_to_ptr; 
-  // create file 
-  // check for name too long 
-  // check for slashes 
-  // allocate memory 
-  // if no memory say no space 
-  // new child in child's directory 
-  // if no space, free empty file again 
-  // reallocate 
-  // free 
-  
+  /* STUB */
   return -1;
 }
 
@@ -557,45 +755,7 @@ int __myfs_mknod_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_unlink_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path) {
-  // destroys a file 
-  /* if path = null, error 
-	get handle, if no file, error 
-	can not delete directory as regular file 
-	find the parent path, modify # kids 
-	if deleting name too long, error
-	can't delete file with slash
-	set current time of modification 
-	if no more kids deallocate kids array 
-	free memory */
-
-      if (path == NULL) {
-            *errnoptr = ENOENT;
-            return -1;
-      }
-
-      handle = get_handle();
-      
-      if (handle = NULL) {
-            errnoptr = EFAULT;
-            return -1;
-      }
-
-      node = __myfs_path_resolve
-      if (node->type != something) {
-      
-      }
-
-
-      //myfs_cut_path_parent_address_base
-      if (parent == NULL){}
-      if (strchr(newfile , '/')!= NULL) {
-            free(parent);
-            free(file);
-            *errnoptr = ENOTDIR;
-            return -1;
-      }
-
-      //if (node_off ==)
+  /* STUB */
   return -1;
 }
 
@@ -616,20 +776,7 @@ int __myfs_unlink_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_rmdir_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path) {
-  /* path null, error
-  can't do if empty 
-  can't find parent path error 
-  name too long error 
-  name has slash error 
-  free */
-    __myfs_handle_t handle;
-    //__myfs_inode_t *node,
-    // path = NULL;
-    // handler = NULL
-    // node = NULL 
-  
-    //  if (node->value)
-
+  /* STUB */
   return -1;
 }
 
@@ -647,16 +794,8 @@ int __myfs_rmdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_mkdir_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path) {
-  /* create dir inside dir 
-	if path null, error
-	already exists error 
-	no memory error */
-      
-      char *parent, *newDir;
-      __myfs_handle_t handle;
-      __myfs_inode_t *node;
-  
-      return -1;
+  /* STUB */
+  return -1;
 }
 
 /* Implements an emulation of the rename system call on the filesystem 
@@ -677,8 +816,6 @@ int __myfs_mkdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_rename_implem(void *fsptr, size_t fssize, int *errnoptr,
                          const char *from, const char *to) {
-      __myfs_handle_t handle;
-      __myfs_inode_t *fromNode, *fromDir;
   /* STUB */
   return -1;
 }
@@ -701,38 +838,7 @@ int __myfs_rename_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_truncate_implem(void *fsptr, size_t fssize, int *errnoptr,
                            const char *path, off_t offset) {
-  /* make file smaller or bigger 
-  smaller = byte removed 
-  bigger = 0's appended 
-  find handle
-  find node
-  if not file error
-  neg size error 
-  new size = old size, only set current time 
-  smaller, find block where to cut 
-  free memory 
-  bigger, allocate more space for 0s 
-  if can't use *2, or create new block, or 'no spaces left'
-  fill 0s using memset */
-  
-  __myfs_handle_t handle;
-  __myfs_inode_t *node;
-  //size_t size;
-  //off_t off
-  handle = __myfs_get_handle(fsptr,fssize);
-  node = __myfs_path_resolve();
-
-      // (node == null) 
-      // node->type != REG_FILE
-
-      //new_size = (size_t) offset;
-      // off = (off_t) realSize;
-      // if (off != offset){} 
-
-      // alloc = new_size;
-      // ms = allocate_mem
-
-      // memset(ms,struct,0,ms_len)
+  /* STUB */
   return -1;
 }
 
@@ -764,20 +870,7 @@ int __myfs_truncate_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_open_implem(void *fsptr, size_t fssize, int *errnoptr,
                        const char *path) {
-  /* open file, check if file 
-  get handle 
-  get node 
-  return 0 */
-  
-  __myfs_handle_t handle;
-  __myfs_inode_t *node;
-
-  handle = __myfs_get_handle == NULL;
-  if (handle == NULL) {
-      *errnoptr = EFAULT;
-      return -1;
-  }
-
+  /* STUB */
   return -1;
 }
 
@@ -798,35 +891,7 @@ int __myfs_open_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_read_implem(void *fsptr, size_t fssize, int *errnoptr,
                        const char *path, char *buf, size_t size, off_t offset) {
-  /* read certain amt bytes out of file starting at offset 
-  find hande, node 
-  must be file 
-  must be positive integer, not beyond lengths of file 
-  read 0 bytes, give 0 
-  otherwise, find data blocks and copy from memory to read
-  memccpy
-  15 bytes out of 10, return 10 bytes
-  */
-
-      int res;
-      //__myfs_handle_t
-      //size_t off,cpy;
-      //off_t
-      //void *
-  
-      res = -1;
-      //handle = __myfs_get_handle() 
-
-      //sizeof(off_t <  sizeof(size_t))
-      //if (offset >=((off_t) (node->file_size)) 
-      //else 
-
-
-      // cpy 
-      // memcpy(buf + already_read, mc_start, mc_len)
-      // already_read += mc_len;
-      // to_read -= mc_len;
-
+  /* STUB */
   return -1;
 }
 
@@ -847,27 +912,7 @@ int __myfs_read_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_write_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path, const char *buf, size_t size, off_t offset) {
-  /* write beyond file, at precicely the end, make file longer 
-  write middle of file, modify file
-  recycle truncate to make file right length 
-  write chunks to file 
-  memccpy from buffer to file
-  free */ 
-  
-  // Professor suggested a recycling of truncate to use for write 
-
-      int res;
-      __myfs_handle_t handle;
-      __myfs_inode_t *node;
-      //size_t off, minSize
-
-      //if (node->value file_size < minSize)
-      //mc_start = __myfs_offset_to_ptr(handle, ((__myfs_file_block_t *) __myfs_offset_to_ptr(handle,curr))->data);
-      //mc_len
-
-
-
-  
+  /* STUB */
   return -1;
 }
 
@@ -886,21 +931,29 @@ int __myfs_write_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_utimens_implem(void *fsptr, size_t fssize, int *errnoptr,
                           const char *path, const struct timespec ts[2]) {
-  /* get handle
-  get path
-  change node times 
-  */
  __myfs_handle_t handle;
  __myfs_inode_t *node;
-
+  // get handle 
  handle = __myfs_get_handle(fsptr, fssize);
+ if (handle == NULL) {
+     *errnoptr = EFAULT;
+     return -1;
+ }
+ // get path
  node = __myfs_path_resolve(fsptr, path);
- 
- node->time[0] = ts[0];
- node->time[1] = ts[1];
+ if (node == NULL) {
+     *errnoptr = ENOENT;
+     return -1;
+ }
+/* change node times in struct timespec times[2] */
+ node->times[0] = ts[0]; // access | st_atim
+ node->times[1] = ts[1]; // modification | st_mtim
 
- return 0;   
+ return 0; 
 }
+
+
+
 
 /* Implements an emulation of the statfs system call on the filesystem 
    of size fssize pointed to by fsptr.
@@ -925,30 +978,38 @@ int __myfs_utimens_implem(void *fsptr, size_t fssize, int *errnoptr,
              filesystem has such a maximum
 
 */
-int __myfs_statfs_implem(void *fsptr, size_t fssize, int *errnoptr,
-                         struct statvfs* stbuf) {
-  /* get handle
+
+/* 
+  Get handle 
   how many blocks are our size 1024(1 byte, can use other sizes)
   blocks = systemsize/ size 
   free blocks 
   available blocks 
   name max length */ 
-
-  __myfs_handle_t handle;
+int __myfs_statfs_implem(void *fsptr, size_t fssize, int *errnoptr,
+                         struct statvfs* stbuf) {
+ 
+ __myfs_handle_t handle;
   handle = __myfs_get_handle(fsptr,fssize);
   
+  // size_t block_size = MYFS_BLOCK_SIZE ((size_t) 1024); 
+
   if (handle == NULL) {
-      errnoptr = EFAULT;
-      return -1;
+    *errnoptr = EFAULT;
+    return -1;
   }
   
-  memset(stbuf,0,sizeof(struct statvfs));
-
-  stbuf->f_bsize;
-  stbuf->f_blocks = fsblkcnt_t( (handle->size) / ((size_t stbuf->f_bsize) /* SOMETHING MISSING HERE */ );
-  // stbuf->f_bfree(fsblkcnt_t(( /*var*/ ((a_size)), ((size_t stbuf->f_bsize));
+  /* How many blocks are our size? - 1024 | (1 byte, can use other defined sizes though)
+   Iterates over free space offsets and computes the total amount of free memory left  */
+  memset(stbuf, 0, sizeof(statvfs));
+  
+  /* Block size is standard size of 1024
+     blocks = BLOCK_SIZE / SIZE */ 
+  stbuf->f_bsize = MYFS_BLOCK_SIZE; 
+  stbuf->f_blocks = ((fsblkcnt_t) (handle->size / MYFS_BLOCK_SIZE));
+  stbuf->f_bfree = ((fsblkcnt_t) (free_space(handle) / MYFS_BLOCK_SIZE));
   stbuf->f_bavail = stbuf->f_bfree;
-  stbuf->f_namemax = (unsigned long) MYFS_MAXIMUM_NAME_LENGTH; 
+  stbuf->f_namemax = (u_long) MYFS_MAXIMUM_NAME_LENGTH; // 256 characters 
   return 0;
 }
 
