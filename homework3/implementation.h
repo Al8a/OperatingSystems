@@ -59,22 +59,6 @@ struct __myfs_memory_block_struct_t {
 };
 
 
-/* inode struct */
-typedef struct __myfs_inode_struct_t __myfs_inode_t;
-struct __myfs_inode_struct_t {
-  __myfs_inode_type_t type;
-  char name[MYFS_MAXIMUM_NAME_LENGTH];
-  struct timespec times[2];
-  /*  st_atim | times[0]: time of last access 
-      st_mtim | times[1]: time of last modification 
-      st_ctim | times[2]: time of last status change <- Doesnt need to be implemented */
-  union {
-    __myfs_inode_file_t file;
-    __myfs_inode_directory_t directory;
-  } value;
-};
-
-
 /* inode file */
 typedef struct __myfs_inode_file_struct_t __myfs_inode_file_t;
 struct __myfs_inode_file_struct_t {
@@ -92,11 +76,28 @@ struct __myfs_inode_directory_struct_t {
 
 
 /* types for inode entries */
-typedef enum __myfs_inode_type_enum_t __myfs_inode_type_t;
-enum __myfs_inode_type_enum_t {
+typedef enum __myfs_inode_enum_type __myfs_inode_type_t;
+enum __myfs_inode_enum_type {
   DIRECTORY,
   REG_FILE
 };
+
+/* inode struct */
+typedef struct __myfs_inode_struct_t __myfs_inode_t;
+struct __myfs_inode_struct_t {
+  __myfs_inode_type_t type;
+  char name[MYFS_MAXIMUM_NAME_LENGTH];
+  struct timespec times[2];
+  /*  st_atim | times[0]: time of last access 
+      st_mtim | times[1]: time of last modification 
+      st_ctim | times[2]: time of last status change <- Doesnt need to be implemented */
+  union {
+    __myfs_inode_file_t file;
+    __myfs_inode_directory_t directory;
+  } value;
+};
+
+
 /* End struct definitions */
 
 
