@@ -1,7 +1,6 @@
 #ifndef __MYFS_IMPL__
 #define __MYFS_IMPL__
 
-
 #include <stddef.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
@@ -20,83 +19,86 @@
 #define MYFS_MAXIMUM_NAME_LENGTH (256)
 #define MYFS_BLOCK_SIZE ((size_t) 1024)
 //#define MYFS_BLOCK_SIZE ((size_t) (4096))
-#define MYFS_STATIC_PATH_BUF_SIZE 8192
-#define MYFS_MAGIC ((uint32_t) (UINT32_C(OxCAFEBABE)))
+#define MYFS_STATIC_PATH_BUF_SIZE (8192)
+#define MYFS_MAGIC (UINT32_C(0xcafebabe)) 
 #define MYFS_TRUNCATE_SMALL_ALLOCATE ((size_t) 512)
+#define INODE_SIZE ((size_t) sizeof(__myfs_inode_t))
+
+typedef size_t __myfs_offset_t; 
+typedef unsigned int u_int;
+typedef unsigned long u_long;
 
 
 /* Structs Declarations -------------------- */
 /*  Handler structure "Super-block" */ 
 typedef struct __myfs_handle_struct_t *__myfs_handle_t;
 struct __myfs_handle_struct_t {
-    uint32_t magic;
-    __myfs_offset_t free_memory;
-    __myfs_offset_t root_dir;
-    size_t size;
+  uint32_t magic;
+  __myfs_offset_t free_memory;
+  __myfs_offset_t root_dir;
+  size_t size;
 };
+
 
 /* File Block Structure */ 
 typedef struct __myfs_file_block_struct_t __myfs_file_block_t;
 struct __myfs_file_block_struct_t {
-	size_t size;
-	size_t allocated;
-	__myfs_offset_t next;
-	__myfs_offset_t data;
+  size_t size;
+  size_t allocated;
+  __myfs_offset_t next;
+  __myfs_offset_t data;
 };
 
+
 /* Memory block structure */
-typedef struct __myfs_memory_block_struct_t *__myfs_handle_t;
+typedef struct __myfs_memory_block_struct_t *__myfs_mem_block_t;
 struct __myfs_memory_block_struct_t {
-	size_t size;
-	size_t user_size;
-	__myfs_offset_t next; 
+  size_t size;
+  size_t user_size;
+  __myfs_offset_t next; 
 };
+
 
 /* inode struct */
 typedef struct __myfs_inode_struct_t __myfs_inode_t;
 struct __myfs_inode_struct_t {
-    __myfs_inode_type_t type;
-    char name[MYFS_MAXIMUM_NAME_LENGTH];
-    struct timespec times[2];
-    /*  st_atim | times[0]: time of last access 
-        st_mtim | times[1]: time of last modification 
-        st_ctim | times[2]: time of last status change <- Doesnt need to be implemented */
-    union {
-        __myfs_inode_file_t file;
-        __myfs_inode_directory_t directory;
-    } type;
+  __myfs_inode_type_t type;
+  char name[MYFS_MAXIMUM_NAME_LENGTH];
+  struct timespec times[2];
+  /*  st_atim | times[0]: time of last access 
+      st_mtim | times[1]: time of last modification 
+      st_ctim | times[2]: time of last status change <- Doesnt need to be implemented */
+  union {
+    __myfs_inode_file_t file;
+    __myfs_inode_directory_t directory;
+  } value;
 };
 
 
 /* inode file */
 typedef struct __myfs_inode_file_struct_t __myfs_inode_file_t;
 struct __myfs_inode_file_struct_t {
-    size_t size;
-    __myfs_offset_t first_block;
+  size_t size;
+  __myfs_offset_t first_block;
 };
 
 
 /* inode directory  */
 typedef struct __myfs_inode_directory_struct_t __myfs_inode_directory_t;
 struct __myfs_inode_directory_struct_t {
-	size_t number_children;
-	__myfs_offset_t children;
+  size_t number_children;
+  __myfs_offset_t children;
 };
 
 
 /* types for inode entries */
 typedef enum __myfs_inode_type_enum_t __myfs_inode_type_t;
 enum __myfs_inode_type_enum_t {
-    DIRECTORY,
-    REG_FILE
+  DIRECTORY,
+  REG_FILE
 };
 /* End struct definitions */
 
-
-/* Typedef definitions */
-typedef size_t __myfs_offset_t; 
-typedef unsigned int u_int;
-typedef unsigned long u_long;
 
 
 /* Helper function definitions */
@@ -111,7 +113,8 @@ static void __myfs_set_filename(char *dst, const char *src);
 static void __myfs_set_curr_time(__myfs_inode_t *node, int modified_flag);
 
 
-/* Memory allocation methods */
+
+/* Memory allocation methods -------------- */
 /* Struct definitons */
 typedef struct s_Allocation {
   size_t remaining_memory;
@@ -126,7 +129,6 @@ void *__malloc_impl(void *fsptr, void *ptr, size_t *size);
 void *__realloc_impl(void *fsptr, void *ptr, size_t *size);
 void *__calloc_impl(void *fsptr, size_t numMemBlocks, size_t *size);     
 void __free_impl(void *fsptr, void *ptr);
-
 
 
 
