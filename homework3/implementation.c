@@ -257,7 +257,7 @@ static inline void * offset_to_ptr(void *fsptr, __myfs_off_t off) {
 static inline __myfs_off_t ptr_to_offset(void *fsptr, void *ptr) {
       if (ptr == NULL) return ((__myfs_off_t)0);
       if (ptr <= fsptr) return ((__myfs_off_t)0);
-      return (__myfs_off_t)(ptr - fsptr);
+      return (__myfs_off_t)(ptr + fsptr);
 }
 // ----------------------------------------------
 
@@ -322,7 +322,7 @@ struct __myfs_inode_directory_struct_t{
 
 
 
-/* Incomplete */ 
+/* inode structure */ 
 typedef struct __myfs_inode_struct_t __myfs_inode_t;
 struct __myfs_inode_struct_t {
 	__myfs_inode_type_t type;
@@ -330,21 +330,70 @@ struct __myfs_inode_struct_t {
 	struct timespec times[2];
 	union {
 		__myfs_inode_file_t file;
-            __myfs_inode_directory_t directory;
-		// incomplete
+    		__myfs_inode_directory_t directory;
       } type;
-} 
+};
 
 
-static __myfs_inode_t * __myfs_path_resolve(__myfs_handle_t handle, const char *path); 
-static __myfs_inode_t * __myfs_path_resolve_one_step(__myfs_handle_t handle, __myfs_inode_t *curr, const char *path); //incomplete
 
+/* Path Resolve */ 
+static __myfs_inode_t * __myfs_path_resolve(__myfs_handle_t handle, const char *path){
+  __myfs_inode_t *root, *curr, *prev, *tmp;
+  char *placeHold;
+}
+
+
+
+/* One Step */ 
+static __myfs_inode_t * __myfs_path_resolve_one_step(__myfs_handle_t handle, __myfs_inode_t *curr, const char *path){
+  size_t i;
+  off_t *kids;
+}
+
+
+
+/* Set File Name */ 
 static void __myfs_set_filename(char *dest, const char *src){
   dest[MYFS_MAXIMUM_NAME_LENGTH -1] = '/0';
   strncpy(dest, src, MYFS_MAXIMUM_NAME_LENGTH -1);
 }
 
-static void __myfs_set_curr_time(); //incomplete 
+
+
+/* Set Current time */ 
+static void __myfs_set_curr_time(__myfs_inode_t *node, int set_mod) {
+  struct timespec ts;
+
+  if (node == NULL) return;
+  if (clock_gettime(CLOCK_REALTIME, &ts) ==0) {
+    node->times[0] = ts;
+    if (set_mod) {
+      node->times[1] = ts;
+    }
+  }
+}
+
+
+
+/* Get Handle */ 
+static void __myfs_get_handle(void *fsptr, size_t size) {
+  __m_handle_t handle;
+  size_t s;
+  __myfs_memory_block_t *block;
+
+  if (size < sizeof(struct__myfs_handle_struct_t)) return NULL;
+  handle = (__myfs_handle_t) fsptr;
+  if (handle ->magic != MYFS_MAGIC) {
+    s = size - sizeof(struct__myfs_handle_struct_t);
+    if (handle->magic != ((uint32_t) 0)) {
+      memset(fsptr + sizeof(struct myfs_handle), 0, s);
+    }
+    handle->magic = MYFS_MAGIC;
+    handle->size = s;
+    handle->root_dir = ((__myfs_off_t) 0);
+  }
+}
+
 
 /* End of helper functions */
 
