@@ -447,7 +447,8 @@ int __myfs_getattr_implem(void *fsptr, size_t fssize, int *errnoptr,
   
   stbuf->st_uid = uid; 
   stbuf->st_gid = gid;
-  // still incomplete
+  stbuf->st_atim = node->times[0];
+  stbuf->st_mtim = node->times[1];
 
   return -1;
 }
@@ -545,11 +546,17 @@ int __myfs_readdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 */
 int __myfs_mknod_implem(void *fsptr, size_t fssize, int *errnoptr,
                         const char *path) {
+  /* create file 
+   check for name too long / check for slashes 
+   allocate memory / if no memory say no space 
+   new child in child's directory 
+   if no space, free empty file again 
+   reallocate, free */
   char *parent, *newfile;
   __myfs_handle_t handle;
   __myfs_off_t *node, prev;
   __myfs_inode_t *new;
-  //__myfs_off_t 
+  __myfs_off_t tmp, tmp2;
   
   if (path == NULL) {
       *errnoptr = ENOENT;
@@ -577,17 +584,7 @@ int __myfs_mknod_implem(void *fsptr, size_t fssize, int *errnoptr,
 
   }
 
-
   new = (__myfs_inode_t*) __myfs_offset_to_ptr; 
-  // create file 
-  // check for name too long 
-  // check for slashes 
-  // allocate memory 
-  // if no memory say no space 
-  // new child in child's directory 
-  // if no space, free empty file again 
-  // reallocate 
-  // free 
   
   return -1;
 }
@@ -616,6 +613,7 @@ int __myfs_unlink_implem(void *fsptr, size_t fssize, int *errnoptr,
 	set current time of modification 
 	if no more kids deallocate kids array 
 	free memory */
+	__myfs_handle_t handle;
 
       if (path == NULL) {
             *errnoptr = ENOENT;
@@ -629,7 +627,7 @@ int __myfs_unlink_implem(void *fsptr, size_t fssize, int *errnoptr,
             return -1;
       }
 
-      node = __myfs_path_resolve
+      node = __myfs_path_resolve;
       if (node->type != something) {
       
       }
@@ -644,7 +642,13 @@ int __myfs_unlink_implem(void *fsptr, size_t fssize, int *errnoptr,
             return -1;
       }
 
-      //if (node_off ==)
+    //if (node_off ==)
+	
+	/* time;
+  	node->times[0] = ts[0];
+  	node->times[1] = ts[1];
+  	return 0; */
+	
   return -1;
 }
 
