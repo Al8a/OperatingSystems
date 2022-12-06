@@ -253,17 +253,12 @@
 
 
 #define MYFS_MAXIMUM_NAME_LENGTH (256)
-#define MYFS_BLOCK_SIZE ((size_t) 1024)
-//#define MYFS_BLOCK_SIZE ((size_t) (4096))
+#define MYFS_size ((size_t) 1024)
+//#define MYFS_size ((size_t) (4096))
 #define MYFS_STATIC_PATH_BUF_SIZE (8192)
 #define MYFS_TRUNCATE_SMALL_ALLOCATE ((size_t) 512)
-#define INODE_SIZE ((size_t) sizeof(__myfs_inode_t))
 #define MYFS_MAGIC ((uint32_t) (UINT32_C(0xcafebabe)))
 
-#define MYFS_HANDLE_SIZE ((size_t) sizeof(__myfs_handle_t))
-#define MYFS_MEM_BLOCK_SIZE ((size_t) sizeof(__myfs_mem_block_t)
-#define INODE_SIZE ((size_t) sizeof(__myfs_inode_t))
-#define FILE_BLOCK_SIZE ((size_t) sizeof(__myfs_file_block_t))
 
 typedef size_t __myfs_offset_t; 
 typedef unsigned int u_int;
@@ -289,34 +284,22 @@ struct __myfs_memory_block_struct_t {
   __myfs_offset_t next; 
 };
 
-/* inode struct */
-typedef struct __myfs_inode_struct_t __myfs_inode_t;
-struct __myfs_inode_struct_t {
-  char name[MYFS_MAXIMUM_NAME_LENGTH];
-  struct timespec accessed_time;
-  struct timespec modified_time;
-  __myfs_inode_type_t type;
-  union {
-      __myfs_inode_file_t file;  
-      __myfs_inode_directory_t directory;
-    } value;
-};
+
 
 /* File Block Structure */ 
-typedef struct __myfs_file_block_struct_t __myfs_file_block_t;
-struct __myfs_file_block_struct_t {
+typedef struct __myfs_file_block_struct_t {
   size_t size;
   size_t allocated;
   __myfs_offset_t next;
   __myfs_offset_t data;
-};
+} __myfs_file_block_t;
 
 
-typedef enum __myfs_inode_enum_type __myfs_inode_type_t;
-enum __myfs_inode_enum_type {
+
+typedef enum __myfs_inode_enum_type {
   DIRECTORY,
   REG_FILE
-};
+} __myfs_inode_type_t;
 
 typedef struct __myfs_inode_struct_file_t {
   size_t size; 
@@ -330,7 +313,18 @@ typedef struct __myfs_inode_struct_directory_t{
 } __myfs_inode_directory_t;
 
 
-
+/* inode struct */
+typedef struct __myfs_inode_struct_t __myfs_inode_t;
+struct __myfs_inode_struct_t {
+  char name[MYFS_MAXIMUM_NAME_LENGTH];
+  struct timespec accessed_time;
+  struct timespec modified_time;
+  __myfs_inode_type_t type;
+  union {
+      __myfs_inode_file_t file;  
+      __myfs_inode_directory_t directory;
+    } value;
+};
 
 
 static inline __myfs_offset_t ptr_to_offset(void *ptr, void *fstpr){
@@ -351,16 +345,17 @@ __myfs_handle_t *__myfs_get_handle(void *fsptr, size_t size){
   __myfs_mem_block_t *block;
   size_t s;
   if (size < sizeof(struct __myfs_handle_struct_t)) return NULL;
+
   if (handle->magic != MYFS_MAGIC) {
-    s = (size - (sizeof(struct __myfs_handle_struct)));  
+    s = (size - (sizeof(struct __myfs_handle_struct_t)));  
     if (handle->magic != ((uint32_t) 0)) {
-      memset(fsptr + sizeof(struct __myfs_handle_struct), 0, s);
+      memset((fsptr + sizeof(struct __myfs_handle_struct_t)), 0, s);
     }
     handle->magic = MYFS_MAGIC; 
     handle->size = s;
 	
-    if (s == (size_t) 0) {
-      handle->free_memory = (__myfs_offset_t) 0;
+    if (s == ((size_t) 0)) {
+      handle->free_memory = ((__myfs_offset_t) 0);
 	  
     } else {
       block = (__myfs_mem_block_t *) offset_to_ptr(fsptr, sizeof(handle));
@@ -467,14 +462,9 @@ void add_to_free_memory(__myfs_handle_t *handle, __myfs_offset_t offset) {
 }
 
 
-void *__myfs_get_free_memory_ptr(void *fsptr) {
-  return &((__myfs_handle_t) fsptr)->free_memory;
-}
-
-
-
 void __myfs_free_impl(__myfs_handle_t *handle, __myfs_offset_t offset) {
-  void *ptr = (((void *) offset_to_ptr(handle, offset)) - MYFS_MEM_BLOCK_SIZE); 
+  void *ptr;
+  ptr = (((void *) offset_to_ptr(handle, offset)) - ((size_t) sizeof(__myfs_mem_block_t))); 
   __myfs_offset_t new_offset = ptr_to_offset(ptr, handle);
   add_to_free_memory(handle, new_offset);
 }
@@ -489,17 +479,16 @@ __myfs_offset_t __myfs_allocate_memory(__myfs_handle_t *handle, size_t size) {
     return (__myfs_offset_t) 0;
   }
   
-  s = (size + MYFS_MEM_BLOCK_SIZE);
+  s = (size + (size_t) sizeof(__myfs_mem_block_t));
   if (s < size) return (__myfs_offset_t) 0;
   
-  ptr = (void *) get_memory_block(handle, s);
+  ptr = ((void *) get_memory_block(handle, s));
+  
   if (ptr != NULL) {
-    offset_mem = ptr_to_offset((ptr + MYFS_MEM_BLOCK_SIZE), handle);
-    return offset_mem;
+    return  ptr_to_offset((ptr + (size_t) sizeof(__myfs_mem_block_t)), handle);
   }
   return (__myfs_offset_t) 0;
 }
-
 
 
 __myfs_offset_t __myfs_reallocate_memory(__myfs_handle_t *handle, __myfs_offset_t offset, size_t size) {
@@ -519,7 +508,7 @@ __myfs_offset_t __myfs_reallocate_memory(__myfs_handle_t *handle, __myfs_offset_
     if (new_offset == (__myfs_offset_t) 0) return (__myfs_offset_t) 0;  
 
     old_ptr = offset_to_ptr(handle, offset);
-    old_mem_block = (__myfs_mem_block_t *) (old_ptr - MYFS_MEM_BLOCK_SIZE);
+    old_mem_block = (__myfs_mem_block_t *) (old_ptr - (size_t) sizeof(__myfs_mem_block_t));
     s = old_mem_block->size;
     if (size < s) {
         s = size;
@@ -540,7 +529,7 @@ __myfs_inode_t *__myfs_path_resolve(__myfs_handle_t *handle, const char *path) {
   if (handle->root_directory == (__myfs_offset_t) 0) {
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
-    handle->root_directory = __myfs_allocate_memory(handle, INODE_SIZE);
+    handle->root_directory = __myfs_allocate_memory(handle, ((size_t) sizeof(__myfs_inode_t)));
     __myfs_inode_t *root = (__myfs_inode_t *) offset_to_ptr(handle, handle->root_directory);
     
     root->name[0] = '/';
@@ -553,7 +542,7 @@ __myfs_inode_t *__myfs_path_resolve(__myfs_handle_t *handle, const char *path) {
   }
   
   node = (__myfs_inode_t *) offset_to_ptr(handle, handle->root_directory);
-  if (strcmp("/\0", path) == 0) { // path is root directory
+  if (strcmp("/\0", path) == 0) { 
     return node;
   }
     
@@ -575,7 +564,7 @@ __myfs_inode_t *__myfs_path_resolve(__myfs_handle_t *handle, const char *path) {
     strncpy(file_name, name, size);
     file_name[size] = '\0';
     for (i = 0; i < node->value.directory.number_children; i++) {
-      child = (__myfs_inode_t *) offset_to_ptr(handle,(node->value.directory.children + i * INODE_SIZE));
+      child = (__myfs_inode_t *) offset_to_ptr(handle,(node->value.directory.children + i * ((size_t) sizeof(__myfs_inode_t))));
       if (strcmp(child->name, file_name) == 0) {
 	node = child;
 	break;
@@ -606,10 +595,11 @@ size_t __myfs_total_size(__myfs_handle_t *handle) {
   
   max_free_size = (size_t) 0;
   for (mem_block = (__myfs_mem_block_t *) offset_to_ptr(handle, handle->free_memory);
-       mem_block != NULL; mem_block = (__myfs_mem_block_t *) (offset_to_ptr(handle,mem_block->next))) {
-    if (mem_block->size > max_free_size) {
-      max_free_size = mem_block->size;
-    }
+       mem_block != NULL; 
+       mem_block = (__myfs_mem_block_t *) (offset_to_ptr(handle,mem_block->next))) {
+        if (mem_block->size > max_free_size) {
+          max_free_size = mem_block->size;
+        }
   }
   return max_free_size;
 }
@@ -650,6 +640,7 @@ int __myfs_getattr_implem(void *fsptr, size_t fssize, int *errnoptr,
     __myfs_handle_t *handle; 
     __myfs_inode_t *node;
     char *file_name;
+    int counter;
     size_t i;
 
     handle = __myfs_get_handle(fsptr, fssize);
@@ -682,14 +673,13 @@ int __myfs_getattr_implem(void *fsptr, size_t fssize, int *errnoptr,
     if (node->type == DIRECTORY) {
     stbuf->st_mode = S_IFDIR | 0755;
      __myfs_inode_t *children = (__myfs_inode_t *) __off_to_ptr(handle, node->value.directory.children);
-        int counter = 0;
+        counter = 0;
         for (i = (size_t) 0; i < node->value.directory.number_children; i++) {
             if(children[i].type == DIRECTORY) {
                 counter++;
             }
         }
         stbuf->st_nlink = counter;
-
   } else if (node->type == REG_FILE) {
         stbuf->st_mode = S_IFREG | 0755;
         stbuf->st_size = node->value.file.size;
@@ -767,7 +757,7 @@ int __myfs_readdir_implem(void *fsptr, size_t fssize, int *errnoptr,
     }
     
     for (size_t i = 0; i < size; i++) {
-        child = ((__myfs_inode_t *) offset_to_ptr(handle,(node->value.directory.children + i * INODE_SIZE)));
+        child = ((__myfs_inode_t *) offset_to_ptr(handle,(node->value.directory.children + i * ((size_t) sizeof(__myfs_inode_t)))));
         names[i] = (char *) calloc(strlen(child->name), sizeof(char));
         strcpy(names[i], child->name);
     }
@@ -810,7 +800,7 @@ int __myfs_mknod_implem(void *fsptr, size_t fssize, int *errnoptr,
     }
 
 
-    if (INODE_SIZE > __myfs_total_size(handle)) {
+    if (((size_t) sizeof(__myfs_inode_t)) > __myfs_total_size(handle)) {
         *errnoptr = ENOMEM;
         return -1;
     }
@@ -842,21 +832,21 @@ int __myfs_mknod_implem(void *fsptr, size_t fssize, int *errnoptr,
     num_children = node->value.directory.number_children;
 
     if (num_children == 1) {
-       node->value.directory.children = __myfs_allocate_memory(handle, INODE_SIZE);
+       node->value.directory.children = __myfs_allocate_memory(handle, ((size_t) sizeof(__myfs_inode_t)));
         if (node->value.directory.children == (__myfs_offset_t) 0) {
             *errnoptr = ENOMEM;
             return -1;
         }
     } else {
        node->value.directory.children = __myfs_reallocate_memory(handle,
-                node->value.directory.children, num_children * INODE_SIZE);
+                node->value.directory.children, num_children * ((size_t) sizeof(__myfs_inode_t)));
         if (node->value.directory.children == (__myfs_offset_t) 0) {
             *errnoptr = ENOMEM;
             return -1;
         }
     }
 
-    child = (__myfs_inode_t *) offset_to_ptr(handle, (node->value.directory.children + (num_children - 1) * INODE_SIZE)); 
+    child = (__myfs_inode_t *) offset_to_ptr(handle, (node->value.directory.children + (num_children - 1) * ((size_t) sizeof(__myfs_inode_t)))); 
 
     strcpy(child->name, file_name);
     child->type = REG_FILE;
@@ -927,7 +917,7 @@ int __myfs_unlink_implem(void *fsptr, size_t fssize, int *errnoptr,
   }
   
   for (size_t i = 0; i < dir_node->value.directory.number_children; i++) {
-    node = (__myfs_inode_t *) offset_to_ptr(handle,dir_node->value.directory.children + i * INODE_SIZE);
+    node = (__myfs_inode_t *) offset_to_ptr(handle,dir_node->value.directory.children + i * ((size_t) sizeof(__myfs_inode_t)));
     if (strcmp(node->name, file_name) == 0) {
       break;
     }
@@ -950,11 +940,11 @@ int __myfs_unlink_implem(void *fsptr, size_t fssize, int *errnoptr,
   node->value.file.size = (size_t) 0;
   
   if (dir_node->value.directory.number_children > 1) {
-    memcpy((void *) node, offset_to_ptr(handle, (dir_node->value.directory.children + (dir_node->value.directory.number_children - 1) * INODE_SIZE)), INODE_SIZE);
+    memcpy((void *) node, offset_to_ptr(handle, (dir_node->value.directory.children + (dir_node->value.directory.number_children - 1) * ((size_t) sizeof(__myfs_inode_t)))), ((size_t) sizeof(__myfs_inode_t)));
   }
 
   dir_node->value.directory.number_children--;
-  dir_node->value.directory.children = __myfs_reallocate_memory(handle,dir_node->value.directory.children, (dir_node->value.directory.number_children * INODE_SIZE));
+  dir_node->value.directory.children = __myfs_reallocate_memory(handle,dir_node->value.directory.children, (dir_node->value.directory.number_children * ((size_t) sizeof(__myfs_inode_t))));
   
   free(dir_path);
   return 0;
@@ -1023,7 +1013,7 @@ int __myfs_rmdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 
     for (size_t i = 0; i < dir_node->value.directory.number_children; i++){
         node = (__myfs_inode_t *) offset_to_ptr(handle,
-               dir_node->value.directory.children + i * INODE_SIZE);
+               dir_node->value.directory.children + i * ((size_t) sizeof(__myfs_inode_t)));
 
         if (strcmp(node->name, dir_name) == 0){
             break;
@@ -1032,14 +1022,14 @@ int __myfs_rmdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 
     if (dir_node->value.directory.number_children > 1) {
         memcpy((void *) node, offset_to_ptr(handle, (dir_node->value.directory.children 
-                + (dir_node->value.directory.number_children - 1) * INODE_SIZE)),
-            INODE_SIZE);
+                + (dir_node->value.directory.number_children - 1) * ((size_t) sizeof(__myfs_inode_t)))),
+            ((size_t) sizeof(__myfs_inode_t)));
     }
 
     dir_node->value.directory.number_children--;
     dir_node->value.directory.children = __myfs_reallocate_memory(handle,
             dir_node->value.directory.children, (dir_node->value.directory.number_children
-                * INODE_SIZE));
+                * ((size_t) sizeof(__myfs_inode_t))));
 
     free(dir_path);
     return 0;
@@ -1072,7 +1062,7 @@ int __myfs_mkdir_implem(void *fsptr, size_t fssize, int *errnoptr,
         return -1;
     }
 
-    if (INODE_SIZE > __myfs_total_size(handle)){
+    if (((size_t) sizeof(__myfs_inode_t)) > __myfs_total_size(handle)){
         *errnoptr = ENOMEM;
         return -1;
     }
@@ -1085,7 +1075,7 @@ int __myfs_mkdir_implem(void *fsptr, size_t fssize, int *errnoptr,
 
     dir_name = strrchr(path, '/') + 1;
     dir_len = strlen(path) - strlen(dir_name);
-    if (strlen(dir_name) >= MAX_FILE_NAME){
+    if (strlen(dir_name) >= MYFS_MAXIMUM_NAME_LENGTH){
         *errnoptr = ENAMETOOLONG;
         return -1;
     }
@@ -1109,20 +1099,20 @@ int __myfs_mkdir_implem(void *fsptr, size_t fssize, int *errnoptr,
     num_children = node->value.directory.number_children;
 
     if (num_children == 1) {
-       node->value.directory.children = __myfs_allocate_memory(handle, INODE_SIZE);
+       node->value.directory.children = __myfs_allocate_memory(handle, ((size_t) sizeof(__myfs_inode_t)));
         if (node->value.directory.children == (__myfs_offset_t) 0) {
             *errnoptr = ENOMEM;
             return -1;
         }
     } else {
-       node->value.directory.children = __myfs_reallocate_memory(handle, node->value.directory.children, num_children * INODE_SIZE);
+       node->value.directory.children = __myfs_reallocate_memory(handle, node->value.directory.children, num_children * ((size_t) sizeof(__myfs_inode_t)));
         if (node->value.directory.children == (__myfs_offset_t) 0) {
             *errnoptr = ENOMEM;
             return -1;
         }
     }
 
-    child = (__myfs_inode_t *) offset_to_ptr(handle, (node->value.directory.children  + (num_children-1) * INODE_SIZE)); 
+    child = (__myfs_inode_t *) offset_to_ptr(handle, (node->value.directory.children  + (num_children-1) * ((size_t) sizeof(__myfs_inode_t)))); 
 
     strcpy(child->name, dir_name);
     child->type = DIRECTORY;
@@ -1179,7 +1169,7 @@ int __myfs_rename_implem(void *fsptr, size_t fssize, int *errnoptr,
   from_file_name = strrchr(from, '/') + 1;
   from_dir_len = strlen(from) - strlen(from_file_name);
   
-  if (strlen(to_file_name) >= MAX_FILE_NAME) {
+  if (strlen(to_file_name) >= MYFS_MAXIMUM_NAME_LENGTH) {
     *errnoptr = ENAMETOOLONG;
     return -1;
   }
@@ -1223,19 +1213,19 @@ int __myfs_rename_implem(void *fsptr, size_t fssize, int *errnoptr,
   
   to_dir->value.directory.number_children++;
   if (to_dir->value.directory.children == (__myfs_offset_t) 0) {
-    to_dir->value.directory.children = __myfs_allocate_memory(handle,(to_dir->value.directory.number_children * INODE_SIZE));
+    to_dir->value.directory.children = __myfs_allocate_memory(handle,(to_dir->value.directory.number_children * ((size_t) sizeof(__myfs_inode_t))));
   } else {
-    to_dir->value.directory.children = __myfs_reallocate_memory(handle,to_dir->value.directory.children, (to_dir->value.directory.number_children * INODE_SIZE));
+    to_dir->value.directory.children = __myfs_reallocate_memory(handle,to_dir->value.directory.children, (to_dir->value.directory.number_children * ((size_t) sizeof(__myfs_inode_t))));
   }
   
-  memmove(offset_to_ptr(handle, (to_dir->value.directory.children + (to_dir->value.directory.number_children - 1) * INODE_SIZE)), (void *) from_file, INODE_SIZE);
+  memmove(offset_to_ptr(handle, (to_dir->value.directory.children + (to_dir->value.directory.number_children - 1) * ((size_t) sizeof(__myfs_inode_t)))), (void *) from_file, ((size_t) sizeof(__myfs_inode_t)));
   
   from_file->value.file.size = (size_t) 0;
   if (from_dir->value.directory.number_children > 1) {
-    memmove((void *) from_file, offset_to_ptr(handle,(from_dir->value.directory.children + (from_dir->value.directory.number_children - 1) * INODE_SIZE)), INODE_SIZE);
+    memmove((void *) from_file, offset_to_ptr(handle,(from_dir->value.directory.children + (from_dir->value.directory.number_children - 1) * ((size_t) sizeof(__myfs_inode_t)))), ((size_t) sizeof(__myfs_inode_t)));
   }
   from_dir->value.directory.number_children--;
-  from_dir->value.directory.children = __myfs_reallocate_memory(handle,from_dir->value.directory.children, (from_dir->value.directory.number_children * INODE_SIZE));
+  from_dir->value.directory.children = __myfs_reallocate_memory(handle,from_dir->value.directory.children, (from_dir->value.directory.number_children * ((size_t) sizeof(__myfs_inode_t))));
   
   free(from_dir_name);
   free(to_dir_name);
@@ -1284,12 +1274,12 @@ int __myfs_truncate_implem(void *fsptr, size_t fssize, int *errnoptr,
   }
   
   if (node->value.file.size == (size_t) 0) {
-    if ((offset + FILE_BLOCK_SIZE) > (off_t) __myfs_total_size(handle)) {
+    if ((offset + ((size_t) sizeof(__myfs_file_block_t))) > (off_t) __myfs_total_size(handle)) {
       *errnoptr = ENOMEM;
       return -1;
     }
     
-    node->value.file.first_block = __myfs_allocate_memory(handle, FILE_BLOCK_SIZE);
+    node->value.file.first_block = __myfs_allocate_memory(handle, ((size_t) sizeof(__myfs_file_block_t)));
     
     if (node->value.file.first_block == (__myfs_offset_t) 0) {
       *errnoptr = ENOMEM;
@@ -1300,7 +1290,7 @@ int __myfs_truncate_implem(void *fsptr, size_t fssize, int *errnoptr,
     node->value.file.size = offset;
     
   } else if (offset > node->value.file.size) {
-    if ((offset + FILE_BLOCK_SIZE) > (off_t) __myfs_total_size(handle)) {
+    if ((offset + ((size_t) sizeof(__myfs_file_block_t))) > (off_t) __myfs_total_size(handle)) {
       *errnoptr = ENOMEM;
       return -1;
     }
@@ -1308,7 +1298,7 @@ int __myfs_truncate_implem(void *fsptr, size_t fssize, int *errnoptr,
 	 file_block != NULL;
 	 prev = file_block, file_block = (__myfs_file_block_t *) offset_to_ptr(handle,file_block->next));
     
-    prev->next = __myfs_allocate_memory(handle, FILE_BLOCK_SIZE);
+    prev->next = __myfs_allocate_memory(handle, ((size_t) sizeof(__myfs_file_block_t)));
     if (prev->next == (__myfs_offset_t) 0) {
       *errnoptr = ENOMEM;
       return -1;
@@ -1320,22 +1310,22 @@ int __myfs_truncate_implem(void *fsptr, size_t fssize, int *errnoptr,
     node->value.file.size = offset;
     new_offset = offset; 
     for (file_block = (__myfs_file_block_t *) offset_to_ptr(handle,node->value.file.first_block); file_block != NULL;
-	 file_block = (__myfs_file_block_t *) offset_to_ptr(handle,file_block->next)) {
+	  file_block = (__myfs_file_block_t *) offset_to_ptr(handle,file_block->next)) {
       
-      if (new_offset > file_block->block_size) {
-                new_offset -= file_block->block_size;
-      }else{
-	break;
+      if (new_offset > file_block->size) {
+        new_offset -= file_block->size;
+      } else {
+	      break;
       }
     }
     
     file_block->data = __myfs_reallocate_memory(handle, file_block->data, new_offset);
-    file_block->block_size = new_offset;
+    file_block->size = new_offset;
     prev = NULL;
     file_block = (__myfs_file_block_t *) offset_to_ptr(handle, file_block->next);
     while (file_block != NULL) {
       if (prev != NULL) {
-	prev = (__myfs_file_block_t *) __myfs_reallocate_memory(handle, ptr_to_offset((void *)prev, handle), (size_t) 0);
+	      prev = (__myfs_file_block_t *) __myfs_reallocate_memory(handle, ptr_to_offset((void *)prev, handle), (size_t) 0);
       }
       
       __myfs_free_impl(handle, file_block->data);
@@ -1354,7 +1344,7 @@ int __myfs_truncate_implem(void *fsptr, size_t fssize, int *errnoptr,
     *errnoptr = ENOMEM;
     return -1;
   }
-  file_block->block_size = offset;
+  file_block->size = offset;
   memset(offset_to_ptr(handle, file_block->data), '\0', offset);
   
   return 0;
@@ -1457,21 +1447,21 @@ int __myfs_read_implem(void *fsptr, size_t fssize, int *errnoptr,
   for (file_block = (__myfs_file_block_t *) offset_to_ptr(handle,node->value.file.first_block);
        file_block != NULL;
        file_block = (__myfs_file_block_t *) offset_to_ptr(handle,file_block->next)) {
-    if (new_offset > file_block->block_size) {
-      new_offset -= file_block->block_size;
+    if (new_offset > file_block->size) {
+      new_offset -= file_block->size;
     } else {
       break;
     }
   }
   while (file_block != NULL) {
-    if (((size_t) new_offset + new_size) < file_block->block_size) {
+    if (((size_t) new_offset + new_size) < file_block->size) {
       memcpy(buf+num_bytes, offset_to_ptr(handle, ((size_t) new_offset + file_block->data)), new_size);
       num_bytes += (int) new_size;
       break;
     } else {
-      new_size -= (file_block->block_size - new_offset);     
-      memcpy(buf + num_bytes, offset_to_ptr(handle, ((size_t) new_offset + file_block->data)), (file_block->block_size - new_offset));
-      num_bytes += (int) (file_block->block_size - new_offset);
+      new_size -= (file_block->size - new_offset);     
+      memcpy(buf + num_bytes, offset_to_ptr(handle, ((size_t) new_offset + file_block->data)), (file_block->size - new_offset));
+      num_bytes += (int) (file_block->size - new_offset);
     }
     
     if (new_offset != (off_t) 0) {
@@ -1523,7 +1513,7 @@ int __myfs_write_implem(void *fsptr, size_t fssize, int *errnoptr,
   }
   
   if (node->value.file.size == (size_t) 0) {
-    node->value.file.first_block = __myfs_allocate_memory(handle, FILE_BLOCK_SIZE);
+    node->value.file.first_block = __myfs_allocate_memory(handle, ((size_t) sizeof(__myfs_file_block_t)));
     
     if (node->value.file.first_block == (size_t) 0) {
       *errnoptr = ENOMEM;
@@ -1545,7 +1535,7 @@ int __myfs_write_implem(void *fsptr, size_t fssize, int *errnoptr,
       return -1;
     }
     
-    file_block->block_size = size;
+    file_block->size = size;
     file_block->next = (__myfs_offset_t) 0;
     node->value.file.size = size;
   }
@@ -1555,7 +1545,7 @@ int __myfs_write_implem(void *fsptr, size_t fssize, int *errnoptr,
 	 file_block->next != (__myfs_offset_t) 0;
 	 file_block = (__myfs_file_block_t *) offset_to_ptr(handle,file_block->next));
     
-    file_block->next = __myfs_allocate_memory(handle, FILE_BLOCK_SIZE);
+    file_block->next = __myfs_allocate_memory(handle, ((size_t) sizeof(__myfs_file_block_t)));
     
     if (file_block->next == (size_t) 0){
       *errnoptr = ENOMEM;
@@ -1570,7 +1560,7 @@ int __myfs_write_implem(void *fsptr, size_t fssize, int *errnoptr,
       return -1;
     }
     file_block->next = (__myfs_offset_t) 0;
-    file_block->block_size = size;
+    file_block->size = size;
     node->value.file.size += size;
   }
   num_bytes = (size_t) size;
@@ -1647,7 +1637,7 @@ int __myfs_statfs_implem(void *fsptr, size_t fssize, int *errnoptr,
   __myfs_handle_t *handle;
   handle = __myfs_get_handle(fsptr,fssize);
   
-  // size_t block_size = MYFS_BLOCK_SIZE ((size_t) 1024); 
+  // size_t size = MYFS_size ((size_t) 1024); 
   
   if (handle == NULL) {
     *errnoptr = EFAULT;
@@ -1658,10 +1648,10 @@ int __myfs_statfs_implem(void *fsptr, size_t fssize, int *errnoptr,
      Iterates over free space offsets and computes the total amount of free memory left  */
   memset(stbuf, 0, sizeof(statvfs));
   
-  /* Block size is standard size of 1024 | blocks = BLOCK_SIZE / SIZE */ 
-  stbuf->f_bsize = MYFS_BLOCK_SIZE; 
-  stbuf->f_blocks = ((fsblkcnt_t) (handle->size / MYFS_BLOCK_SIZE));
-  stbuf->f_bfree = ((fsblkcnt_t) (free_space(handle) / MYFS_BLOCK_SIZE));
+  /* Block size is standard size of 1024 | blocks = size / SIZE */ 
+  stbuf->f_bsize = MYFS_size; 
+  stbuf->f_blocks = ((fsblkcnt_t) (handle->size / MYFS_size));
+  stbuf->f_bfree = ((fsblkcnt_t) (free_space(handle) / MYFS_size));
   stbuf->f_bavail = stbuf->f_bfree;
   stbuf->f_namemax = (u_long) MYFS_MAXIMUM_NAME_LENGTH; // 256 characters 
   return 0;
