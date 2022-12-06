@@ -671,7 +671,7 @@ int __myfs_getattr_implem(void *fsptr, size_t fssize, int *errnoptr,
 
     if (node->type == DIRECTORY) {
     stbuf->st_mode = S_IFDIR | 0755;
-     __myfs_inode_t *children = (__myfs_inode_t *) off_to_ptr(handle, node->value.directory.children);
+     __myfs_inode_t *children = (__myfs_inode_t *) offset_to_ptr(handle, node->value.directory.children);
         counter = 0;
         for (i = (size_t) 0; i < node->value.directory.number_children; i++) {
             if(children[i].type == DIRECTORY) {
