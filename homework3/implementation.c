@@ -472,7 +472,7 @@ void __myfs_free_impl(__myfs_handle_t *handle, __myfs_offset_t offset) {
 
 
 __myfs_offset_t __myfs_allocate_memory(__myfs_handle_t *handle, size_t size) {
-  size_t s, offset_mem;
+  size_t s;
   void *ptr;
   
   if (size == ((size_t) 0)) { 
@@ -483,7 +483,6 @@ __myfs_offset_t __myfs_allocate_memory(__myfs_handle_t *handle, size_t size) {
   if (s < size) return (__myfs_offset_t) 0;
   
   ptr = ((void *) get_memory_block(handle, s));
-  
   if (ptr != NULL) {
     return  ptr_to_offset((ptr + (size_t) sizeof(__myfs_mem_block_t)), handle);
   }
@@ -672,7 +671,7 @@ int __myfs_getattr_implem(void *fsptr, size_t fssize, int *errnoptr,
 
     if (node->type == DIRECTORY) {
     stbuf->st_mode = S_IFDIR | 0755;
-     __myfs_inode_t *children = (__myfs_inode_t *) __off_to_ptr(handle, node->value.directory.children);
+     __myfs_inode_t *children = (__myfs_inode_t *) off_to_ptr(handle, node->value.directory.children);
         counter = 0;
         for (i = (size_t) 0; i < node->value.directory.number_children; i++) {
             if(children[i].type == DIRECTORY) {
@@ -1651,7 +1650,7 @@ int __myfs_statfs_implem(void *fsptr, size_t fssize, int *errnoptr,
   /* Block size is standard size of 1024 | blocks = size / SIZE */ 
   stbuf->f_bsize = MYFS_size; 
   stbuf->f_blocks = ((fsblkcnt_t) (handle->size / MYFS_size));
-  stbuf->f_bfree = ((fsblkcnt_t) (free_space(handle) / MYFS_size));
+  stbuf->f_bfree = ((fsblkcnt_t) (free_memory_size(handle) / MYFS_size));
   stbuf->f_bavail = stbuf->f_bfree;
   stbuf->f_namemax = (u_long) MYFS_MAXIMUM_NAME_LENGTH; // 256 characters 
   return 0;
