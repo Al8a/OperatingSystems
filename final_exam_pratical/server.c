@@ -140,7 +140,7 @@ int run_child(int connfd, int argc, char **argv) {
   char **new_argv;
 
   /* Copy arguments to fit format for execvp */
-  if (create_new_argv(&new_argv, argc-1, &argv[1]) < 0) {
+  if (create_new_argv(&new_argv, argc, argv) < 0) {
     return -1;
   }
 
@@ -328,7 +328,7 @@ int main(int argc, char **argv) {
   memset(&serveraddr, 0, sizeof(serveraddr));
   serveraddr.sin_family = AF_INET;
   serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
-  serveraddr.sin_port = htons(PORT);
+  serveraddr.sin_port = htons(PORT); /* 172.20.40.24 */
   
   if (bind(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr))) {
     fprintf(stderr, "Cannot bind: %s\n", strerror(errno));
