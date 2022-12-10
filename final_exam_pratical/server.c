@@ -156,7 +156,7 @@ int run_child(int connfd, int argc, char **argv) {
   out = connfd;
 
   /* Make input file descriptor have number of standard-in */
-  if (dup2(in, 0)) {
+  if (dup2(in, 0) < 0) {
     fprintf(stderr, "Cannot execute make a file descriptor become standard input: %s\n", strerror(errno));
     if (close(in) < 0) {
       fprintf(stderr, "Cannot close a file descriptor: %s\n", strerror(errno));
@@ -166,7 +166,7 @@ int run_child(int connfd, int argc, char **argv) {
   }
 
   /* Make output file descriptor have number of standard-out */
-  if (dup2(out, 1)) {
+  if (dup2(out, 1) < 0) {
     fprintf(stderr, "Cannot execute make a file descriptor become standard output: %s\n", strerror(errno));
     free_new_argv(new_argv);
     return -1;
